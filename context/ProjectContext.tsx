@@ -61,6 +61,8 @@ const MOCK_PROJECT: Project = {
   name: 'CinéStock Demo',
   productionCompany: 'Horizon Productions',
   startDate: '2023-10-15',
+  shootingStartDate: '2023-11-01',
+  shootingEndDate: '2023-12-20',
   status: 'Shooting',
   items: [
     { id: '1', name: 'Gaffer Tape', quantityInitial: 10, quantityCurrent: 2, unit: 'rouleaux', status: ItemStatus.USED, department: Department.CAMERA, surplusAction: SurplusAction.NONE, purchased: true },
@@ -106,7 +108,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         }
         // If reserved by someone else, do nothing (or error? UI should prevent this)
         if (item.reservedBy) return item;
-        
+
         // Reserve
         return { ...item, reservedBy: department, status: 'RESERVED' };
       }
@@ -178,11 +180,11 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Filter notifications for the current user
   const userNotifications = notifications.filter(n => {
     if (!user) return false;
-    if (user.department === 'PRODUCTION') return true; // Prod sees everything (or we can filter specifically for prod alerts)
+    if (user.department === 'PRODUCTION' || user.department === 'Régie') return true; // Prod and Régie see everything
     return n.targetDept === user.department || n.targetDept === undefined;
   });
 
-  
+
   const [socialPosts, setSocialPosts] = useState<SocialPost[]>([]);
 
   const addSocialPost = (post: SocialPost) => {
@@ -194,7 +196,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     );
   };
 
-  
+
   const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
 
   const updateUserProfile = (profile: UserProfile) => {
@@ -214,9 +216,9 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     );
   };
 
-  const unreadCount = project.items.filter(i => 
-    !i.purchased && 
-    (user?.department === 'PRODUCTION' || i.department === user?.department)
+  const unreadCount = project.items.filter(i =>
+    !i.purchased &&
+    (user?.department === 'PRODUCTION' || user?.department === 'Régie' || i.department === user?.department)
   ).length;
 
   return (

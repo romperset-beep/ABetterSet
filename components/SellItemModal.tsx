@@ -49,7 +49,7 @@ export const SellItemModal: React.FC<SellItemModalProps> = ({ isOpen, onClose })
 
         addBuyBackItem(newItem);
         onClose();
-        
+
         // Reset form
         setName('');
         setPrice('');
@@ -59,9 +59,9 @@ export const SellItemModal: React.FC<SellItemModalProps> = ({ isOpen, onClose })
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-cinema-900 w-full max-w-lg rounded-2xl border border-cinema-700 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-                
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200 p-4">
+            <div className="bg-cinema-900 w-full max-w-lg rounded-2xl border border-cinema-700 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+
                 {/* Header */}
                 <div className="p-6 border-b border-cinema-700 flex justify-between items-center bg-cinema-800">
                     <h3 className="text-xl font-bold text-white flex items-center gap-2">
@@ -73,12 +73,12 @@ export const SellItemModal: React.FC<SellItemModalProps> = ({ isOpen, onClose })
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                    
+                <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+
                     {/* Photo Upload */}
                     <div className="space-y-2">
                         <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Photo de l'article</label>
-                        <div 
+                        <div
                             onClick={() => fileInputRef.current?.click()}
                             className="relative aspect-video bg-cinema-800 rounded-xl border-2 border-dashed border-cinema-700 hover:border-yellow-500/50 hover:bg-cinema-800/80 transition-all cursor-pointer flex flex-col items-center justify-center group overflow-hidden"
                         >
@@ -90,12 +90,12 @@ export const SellItemModal: React.FC<SellItemModalProps> = ({ isOpen, onClose })
                                     <span className="text-sm text-slate-400 group-hover:text-slate-200">Cliquez pour ajouter une photo</span>
                                 </>
                             )}
-                            <input 
-                                type="file" 
-                                ref={fileInputRef} 
-                                onChange={handlePhotoUpload} 
-                                accept="image/*" 
-                                className="hidden" 
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handlePhotoUpload}
+                                accept="image/*"
+                                className="hidden"
                             />
                         </div>
                     </div>

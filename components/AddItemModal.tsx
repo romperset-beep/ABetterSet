@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Department, ConsumableItem, ItemStatus, SurplusAction } from '../types';
 import { X, Plus, Leaf, List, Search, Upload, Loader2, AlertCircle } from 'lucide-react';
 import { suggestEcoAlternatives, analyzeOrderFile } from '../services/geminiService';
@@ -6,16 +6,85 @@ import { useProject } from '../context/ProjectContext';
 
 // Popular items database for the scrolling banner
 const POPULAR_ITEMS: Record<string, string[]> = {
-    [Department.CAMERA]: ['Gaffer Tape Noir 50mm', 'Dust Off (Air Sec)', 'Lingettes Optiques', 'Marqueur Ardoise', 'Bongo Ties', 'Microfibre', 'Piles AA Lithium', 'Velcro Adhésif', 'Charte de Gris', 'Clap', 'Stylo Nettoyage Objectif'],
-    [Department.LUMIERE]: ['Gélatine CTB 1/2', 'Gélatine CTO 1/4', 'Black Wrap', 'C-47 (Pinces bois)', 'Ruban Élec (Barnier)', 'Diffusion 216', 'Spigot', 'Gants Chaleur', 'Cinefoil', 'Domino', 'Scotch Aluminium'],
-    [Department.MACHINERIE]: ['Sangle à cliquet', 'Cordelette Noire', 'Tapis de sol', 'Wedges (Cales)', 'Ball de Tennis', 'Gaffer Tape Fluo', 'Chaîne de sécurité', 'Mousqueton', 'Poulie', 'Duvetine'],
-    [Department.SON]: ['Piles AA Pro', 'Piles 9V', 'Mousse Micro', 'Adhésif Double Face', 'Moleskin', 'Connecteurs XLR', 'Lingettes Désinfectantes', 'Bonnette Anti-vent', 'Sangle Velcro', 'Adaptateur Jack'],
-    [Department.MAQUILLAGE]: ['Éponges Latex', 'Coton Démaquillant', 'Lingettes Bébé', 'Laque Cheveux', 'Sang Artificiel', 'Kleener', 'Cotons-tiges', 'Fond de teint', 'Poudre Matifiante', 'Colle à postiche'],
-    [Department.COIFFURE]: ['Épingles à cheveux', 'Laque Forte', 'Brosses Jetables', 'Élastiques', 'Filet à cheveux', 'Shampoing Sec', 'Gel Coiffant', 'Peigne à queue', 'Mousse Volume'],
-    [Department.COSTUME]: ['Épingles de sûreté', 'Cintres Métal', 'Eau Déminéralisée', 'Brosse Adhésive', 'Détachant Express', 'Semelles', 'Fil à coudre (Noir/Blanc)', 'Boutons assortis', 'Ruban Mètre'],
-    [Department.DECO]: ['Patafix', 'Fil de fer', 'Peinture Noire Mat', 'Vis à bois', 'Scotch Double Face Moquette', 'Carton Plume', 'Cutter', 'Lames Cutter', 'Colle à bois', 'Clous'],
-    [Department.REGIE]: ['Gobelets Carton', 'Café Moulu', 'Sacs Poubelle 100L', 'Essuie-Tout', 'Papier Toilette', 'Bouteilles Eau 50cl', 'Gel Hydroalcoolique', 'Sucre', 'Touillettes bois', 'Sacs Ziploc'],
-    [Department.ACCESSOIRE]: ['Briquet', 'Cendrier Portable', 'Stylos Bic', 'Carnet Notes', 'Colle Super Glue', 'Piles AAA', 'Scotch Transparent', 'Ciseaux', 'Lampe Torche']
+    [Department.CAMERA]: [
+        'Gaffer Tape Noir 50mm', 'Gaffer Tape Blanc 50mm', 'Gaffer Tape Noir 25mm', 'Camera Tape (toutes couleurs)',
+        'Dust Off (Air Sec)', 'Pancro (Nettoyant Optique)', 'Lingettes Optiques (Kimwipes)', 'Microfibre',
+        'Marqueur Ardoise (Noir/Rouge/Bleu)', 'Bongo Ties', 'Velcro Adhésif', 'Velcro Double Face',
+        'Piles AA Lithium', 'Piles AAA Lithium', 'Piles 9V', 'Batteries CR123',
+        'Charte de Gris', 'Clap', 'Stylo Nettoyage Objectif', 'Coton-tige Précision',
+        'T-Marker', 'Coins Photo', 'Chamoisine', 'Housse Pluie Caméra'
+    ],
+    [Department.LUMIERE]: [
+        'Gélatine CTB (Full/1/2/1/4)', 'Gélatine CTO (Full/1/2/1/4)', 'Gélatine Plus Green', 'Gélatine Minus Green',
+        'Diffusion 216 (White Diffusion)', 'Diffusion 250 (Half White)', 'Diffusion 251 (Quarter White)',
+        'Grid Cloth (Full/Lite/Quarter)', 'Opal Frost', 'Hampshire Frost',
+        'Black Wrap (Cinefoil)', 'Ruban Élec (Barnier) Noir/Blanc/Couleurs',
+        'C-47 (Pinces bois)', 'Spigot', 'Gants Chaleur', 'Domino', 'Scotch Aluminium',
+        'J-Lar (Scotch Transparent)', 'Duvetine Noire', 'Cyc Tape', 'Spray Dulling (Matifiant)'
+    ],
+    [Department.MACHINERIE]: [
+        'Gaffer Tape Fluo (Rose/Vert/Jaune/Orange)', 'Gaffer Tape Noir 50mm',
+        'Sangle à cliquet', 'Cordelette Noire (Drisse)', 'Cordelette Blanche',
+        'Tapis de sol', 'Wedges (Cales bois)', 'Pagnotte (Cales)', 'Ball de Tennis',
+        'Chaîne de sécurité', 'Mousqueton', 'Poulie', 'Manille',
+        'Duvetine', 'Borniol', 'Polyane (Bâche protection)', 'Couverture de son',
+        'WD-40', 'Graisse Lithium', 'Nettoyant Freins'
+    ],
+    [Department.SON]: [
+        'Piles AA Pro (Duracell/Varta)', 'Piles AAA Pro', 'Piles 9V',
+        'Mousse Micro', 'Bonnette Anti-vent', 'Poils (Windjammer)',
+        'Adhésif Double Face (Topstick)', 'Moleskin', 'Urgo (Pansements)',
+        'Connecteurs XLR', 'Adaptateur Jack', 'Câble Micro',
+        'Lingettes Désinfectantes', 'Sangle Velcro', 'Ceinture Émetteur'
+    ],
+    [Department.MAQUILLAGE]: [
+        'Éponges Latex', 'Houpette', 'Coton Démaquillant', 'Lingettes Bébé', 'Kleenex',
+        'Laque Cheveux', 'Gel Coiffant', 'Sang Artificiel', 'Latex Liquide',
+        'Kleener (Nettoyant Pinceaux)', 'Alcool 70°', 'Cotons-tiges', 'Bâtonnets Biseautés',
+        'Fond de teint', 'Poudre Matifiante', 'Colle à postiche (Spirit Gum)', 'Dissolvant',
+        'Miroir Main', 'Serviettes Invité'
+    ],
+    [Department.COIFFURE]: [
+        'Épingles à cheveux (Neige/Bronze/Noir)', 'Épingles à chignon', 'Pinces Kirby',
+        'Laque Forte', 'Laque Souple', 'Shampoing Sec', 'Mousse Volume', 'Cire Coiffante',
+        'Brosses Jetables', 'Peigne à queue', 'Élastiques (Transparents/Noirs)', 'Filet à cheveux',
+        'Capes de coupe', 'Vaporisateur Eau'
+    ],
+    [Department.COSTUME]: [
+        'Épingles de sûreté (Nourrice)', 'Épingles Tête Verre',
+        'Cintres Métal', 'Cintres Bois', 'Cintres Pince',
+        'Eau Déminéralisée', 'Brosse Adhésive', 'Recharges Brosse Adhésive',
+        'Détachant Express (K2R)', 'Lingettes Anti-décoloration',
+        'Semelles', 'Lacets', 'Talonnettes',
+        'Fil à coudre (Noir/Blanc/Gris)', 'Boutons assortis', 'Ruban Mètre', 'Craie Tailleur',
+        'Défroisseur Vapeur', 'Sacs Housse Costume'
+    ],
+    [Department.DECO]: [
+        'Patafix (Blanche/Jaune)', 'Fil de fer', 'Fil Nylon',
+        'Peinture Noire Mat', 'Peinture Blanche', 'Bombes Peinture (Divers)',
+        'Vis à bois', 'Clous', 'Crochets X',
+        'Scotch Double Face Moquette', 'Scotch Double Face Mousse', 'Scotch Masquage (Tesa)',
+        'Carton Plume', 'Cutter', 'Lames Cutter', 'Tapis de découpe',
+        'Colle à bois', 'Colle Néoprène', 'Colle Spray (3M 77)',
+        'Papier de verre', 'Chiffons', 'White Spirit', 'Acétone'
+    ],
+    [Department.REGIE]: [
+        'Gobelets Carton', 'Touillettes bois', 'Sucre (Morceaux/Poudre)', 'Café Moulu', 'Thé/Infusions',
+        'Bouteilles Eau 50cl', 'Fontaine Eau',
+        'Sacs Poubelle 100L', 'Sacs Poubelle 50L', 'Sacs Gravats',
+        'Essuie-Tout', 'Papier Toilette', 'Mouchoirs',
+        'Gel Hydroalcoolique', 'Savon Main', 'Liquide Vaisselle', 'Éponges',
+        'Sacs Ziploc (Petit/Moyen/Grand)', 'Film Étirable', 'Papier Alu',
+        'Cendriers', 'Balai', 'Pelle', 'Seau'
+    ],
+    [Department.ACCESSOIRE]: [
+        'Briquet', 'Allumettes', 'Cendrier Portable',
+        'Stylos Bic (Noir/Bleu)', 'Marqueurs Indélébiles', 'Surligneurs',
+        'Carnet Notes', 'Bloc-notes', 'Post-it',
+        'Colle Super Glue', 'Piles AAA', 'Piles AA',
+        'Scotch Transparent', 'Scotch Emballage',
+        'Ciseaux', 'Couteau Suisse', 'Lampe Torche', 'Frontale'
+    ]
 };
 
 interface AddItemModalProps {
@@ -33,6 +102,82 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose }) =
     const [loadingSuggestion, setLoadingSuggestion] = useState(false);
     const [isCatalogOpen, setIsCatalogOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [suggestions, setSuggestions] = useState<string[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [selectedIndex, setSelectedIndex] = useState(-1);
+    const suggestionsListRef = useRef<HTMLDivElement>(null);
+
+    // Flatten all items for global autocomplete
+    const allCatalogItems = useMemo(() => {
+        const allItems = new Set<string>();
+        Object.values(POPULAR_ITEMS).forEach(items => items.forEach(i => allItems.add(i)));
+        // Also add items from history
+        project.items.forEach(i => allItems.add(i.name));
+        return Array.from(allItems).sort();
+    }, [project.items]);
+
+    // Filter suggestions when typing
+    useEffect(() => {
+        if (!newItemName || newItemName.length < 2) {
+            setSuggestions([]);
+            setShowSuggestions(false);
+            return;
+        }
+
+        const lowerInput = newItemName.toLowerCase();
+        const filtered = allCatalogItems.filter(item =>
+            item.toLowerCase().includes(lowerInput)
+        ).slice(0, 50); // Increased limit to 50
+
+        setSuggestions(filtered);
+        setShowSuggestions(filtered.length > 0);
+        setSelectedIndex(-1); // Reset selection on new search
+    }, [newItemName, allCatalogItems]);
+
+    const selectSuggestion = (name: string) => {
+        setNewItemName(name);
+        setShowSuggestions(false);
+        setSelectedIndex(-1);
+        handleGetEcoTip(name);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (!showSuggestions || suggestions.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            e.stopPropagation();
+            setSelectedIndex(prev => (prev < suggestions.length - 1 ? prev + 1 : prev));
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            e.stopPropagation();
+            setSelectedIndex(prev => (prev > -1 ? prev - 1 : -1));
+        } else if (e.key === 'Enter') {
+            if (selectedIndex >= 0) {
+                e.preventDefault();
+                e.stopPropagation();
+                selectSuggestion(suggestions[selectedIndex]);
+            }
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            setShowSuggestions(false);
+        }
+    };
+
+    // Auto-scroll to selected item
+    useEffect(() => {
+        if (selectedIndex >= 0 && suggestionsListRef.current) {
+            const list = suggestionsListRef.current;
+            const element = list.children[selectedIndex] as HTMLElement;
+            if (element) {
+                element.scrollIntoView({ block: 'nearest' });
+            }
+        }
+    }, [selectedIndex]);
+
+    // ... (rest of the file)
+
+
 
     // Sync form department with global department if not Production
     useEffect(() => {
@@ -46,10 +191,17 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose }) =
     const handleAddItem = () => {
         if (!newItemName) return;
 
+        // Determine final department:
+        // If user is PRODUCTION (Admin) or REGIE, they can order for the selected department.
+        // If user is another Department, they can only order for themselves, even if they browsed another catalog.
+        const finalDepartment = (currentDept === 'PRODUCTION' || currentDept === Department.REGIE)
+            ? selectedDept
+            : (currentDept as Department);
+
         const newItem: ConsumableItem = {
             id: Math.random().toString(36).substr(2, 9),
             name: newItemName,
-            department: selectedDept,
+            department: finalDepartment,
             quantityInitial: newItemQty,
             quantityCurrent: newItemQty,
             unit: 'unités',
@@ -64,12 +216,8 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose }) =
         }));
 
         // Notify Production
-        // Assuming addNotification and user are available in this scope, e.g., from useProject or another context.
-        // For this change, we're replacing the incorrect object with the provided function call.
-        // The original code had a syntax error here, which is being corrected.
-        // The 'user' variable is assumed to be accessible, e.g., from project.user or a user context.
         addNotification(
-            `Nouvelle commande de ${newItemQty}x ${newItemName} (${selectedDept}) par ${user?.name}`,
+            `Nouvelle commande de ${newItemQty}x ${newItemName} (${finalDepartment}) par ${user?.name}`,
             'ORDER',
             Department.REGIE,
             newItem.id
@@ -81,6 +229,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose }) =
         setSuggestion(null);
         onClose();
     };
+
 
     const handleGetEcoTip = async (name?: string) => {
         const targetName = name || newItemName;
@@ -107,10 +256,10 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose }) =
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-cinema-800 rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-cinema-600 flex flex-col relative">
+            <div className="bg-cinema-800 rounded-2xl shadow-2xl max-w-2xl w-full border border-cinema-600 flex flex-col relative">
 
                 {/* Header */}
-                <div className="p-6 border-b border-cinema-700 flex justify-between items-center bg-cinema-900">
+                <div className="p-6 border-b border-cinema-700 flex justify-between items-center bg-cinema-900 rounded-t-2xl">
                     <h3 className="text-xl font-bold text-white flex items-center gap-2">
                         <Plus className="h-6 w-6 text-eco-400" />
                         Nouvelle Commande
@@ -207,8 +356,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose }) =
                             <select
                                 value={selectedDept}
                                 onChange={(e) => setSelectedDept(e.target.value as Department)}
-                                disabled={currentDept !== 'PRODUCTION'}
-                                className={`w-full bg-cinema-900 border border-cinema-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-eco-500 focus:outline-none ${currentDept !== 'PRODUCTION' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`w-full bg-cinema-900 border border-cinema-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-eco-500 focus:outline-none`}
                             >
                                 {Object.values(Department).map(dept => (
                                     <option key={dept} value={dept}>{dept}</option>
@@ -239,7 +387,35 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose }) =
                                     onChange={(e) => setNewItemName(e.target.value)}
                                     className="w-full bg-cinema-900 border border-cinema-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-eco-500 focus:outline-none"
                                     autoComplete="off"
+                                    onFocus={() => {
+                                        if (suggestions.length > 0) setShowSuggestions(true);
+                                    }}
+                                    onBlur={() => {
+                                        // Delay hiding to allow click
+                                        setTimeout(() => setShowSuggestions(false), 200);
+                                    }}
+                                    onKeyDown={handleKeyDown}
                                 />
+                                {showSuggestions && (
+                                    <div
+                                        ref={suggestionsListRef}
+                                        className="absolute z-10 w-full mt-1 bg-cinema-800 border border-cinema-600 rounded-lg shadow-xl max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2 custom-scrollbar"
+                                    >
+                                        {suggestions.map((suggestion, idx) => (
+                                            <button
+                                                key={idx}
+                                                onClick={() => selectSuggestion(suggestion)}
+                                                className={`w-full text-left px-4 py-2 text-sm transition-colors flex items-center gap-2 ${idx === selectedIndex
+                                                    ? 'bg-eco-600 text-white font-medium'
+                                                    : 'text-slate-200 hover:bg-cinema-700 hover:text-white'
+                                                    }`}
+                                            >
+                                                <Search className={`h-3 w-3 ${idx === selectedIndex ? 'text-white' : 'text-slate-500'}`} />
+                                                {suggestion}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                                 {loadingSuggestion && <Leaf className="absolute right-3 top-3 h-4 w-4 text-eco-400 animate-spin" />}
                             </div>
                             <button
@@ -269,7 +445,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose }) =
                 </div>
 
                 {/* Footer */}
-                <div className="p-6 border-t border-cinema-700 bg-cinema-900/50 flex justify-end gap-3">
+                <div className="p-6 border-t border-cinema-700 bg-cinema-900/50 flex justify-end gap-3 rounded-b-2xl">
                     <button
                         onClick={onClose}
                         className="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-cinema-700 transition-colors"
@@ -288,7 +464,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose }) =
 
                 {/* Nested Catalog Modal */}
                 {isCatalogOpen && (
-                    <div className="absolute inset-0 z-50 bg-cinema-800 flex flex-col animate-in slide-in-from-bottom-10">
+                    <div className="absolute inset-0 z-50 bg-cinema-800 flex flex-col animate-in slide-in-from-bottom-10 rounded-2xl overflow-hidden">
                         <div className="p-4 border-b border-cinema-700 flex justify-between items-center bg-cinema-900">
                             <h3 className="text-lg font-bold text-white flex items-center gap-2">
                                 <List className="h-5 w-5 text-eco-400" />

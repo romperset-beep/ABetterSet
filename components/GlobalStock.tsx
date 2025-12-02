@@ -1,7 +1,8 @@
+
 import React from 'react';
 import { useProject } from '../context/ProjectContext';
 import { Department, ItemStatus, SurplusAction } from '../types';
-import { Globe, TrendingUp, Package, ArrowRight, Building2 } from 'lucide-react';
+import { Globe, TrendingUp, Package, ArrowRight, Building2, Edit, Trash2, Save, X } from 'lucide-react';
 
 // Mock Data for Global Stock (simulating other productions)
 const MOCK_GLOBAL_STOCK = [
@@ -58,7 +59,47 @@ const MOCK_GLOBAL_STOCK = [
 ];
 
 export const GlobalStock: React.FC = () => {
-    const { project } = useProject();
+    const { project, setProject } = useProject();
+    const [mockItems, setMockItems] = React.useState(MOCK_GLOBAL_STOCK);
+    const [editingItem, setEditingItem] = React.useState<any | null>(null);
+    const [editForm, setEditForm] = React.useState({ price: 0, quantity: 0 });
+
+    const handleEditClick = (item: any) => {
+        setEditingItem(item);
+        setEditForm({ price: item.price, quantity: item.quantity });
+    };
+
+    const handleSave = () => {
+        if (!editingItem) return;
+
+        if (editingItem.id.startsWith('g')) {
+            // Mock Item
+            setMockItems(prev => prev.map(i => i.id === editingItem.id ? { ...i, ...editForm } : i));
+        } else {
+            // Real Project Item
+            setProject(prev => ({
+                ...prev,
+                items: prev.items.map(i => i.id === editingItem.id ? { ...i, quantityCurrent: editForm.quantity, price: editForm.price } : i)
+            }));
+        }
+        setEditingItem(null);
+    };
+
+    const handleDelete = () => {
+        if (!editingItem) return;
+
+        if (editingItem.id.startsWith('g')) {
+            // Mock Item
+            setMockItems(prev => prev.filter(i => i.id !== editingItem.id));
+        } else {
+            // Real Project Item - Remove from Marketplace (set SurplusAction to NONE)
+            setProject(prev => ({
+                ...prev,
+                items: prev.items.map(i => i.id === editingItem.id ? { ...i, surplusAction: SurplusAction.NONE } : i)
+            }));
+        }
+        setEditingItem(null);
+    };
 
     // Get current project's virtual stock
     const currentProjectStock = project.items
@@ -75,7 +116,7 @@ export const GlobalStock: React.FC = () => {
         }));
 
     // Combine with mock data
-    const allStock = [...MOCK_GLOBAL_STOCK, ...currentProjectStock];
+    const allStock = [...mockItems, ...currentProjectStock];
 
     // Calculate Total Savings
     const totalSavings = allStock.reduce((acc, item) => acc + (item.price * item.quantity), 0);
@@ -158,8 +199,11 @@ export const GlobalStock: React.FC = () => {
                                             {(item.price * item.quantity).toLocaleString('fr-FR')} €
                                         </div>
                                     </div>
-                                    <button className="p-2 rounded-lg bg-cinema-700 text-slate-300 hover:bg-blue-600 hover:text-white transition-all opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0">
-                                        <ArrowRight className="h-5 w-5" />
+                                    <button
+                                        onClick={() => handleEditClick(item)}
+                                        className="p-2 rounded-lg bg-cinema-700 text-slate-300 hover:bg-blue-600 hover:text-white transition-all opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0"
+                                    >
+                                        <Edit className="h-5 w-5" />
                                     </button>
                                 </div>
                             </div>
@@ -167,6 +211,75 @@ export const GlobalStock: React.FC = () => {
                     ))}
                 </div>
             </div>
+
+            {/* Edit Modal */}
+            {editingItem && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200 p-4">
+                    <div className="bg-cinema-900 w-full max-w-md rounded-2xl border border-cinema-700 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-cinema-700 flex justify-between items-center bg-cinema-800">
+                            <h3 className="text-xl font-bold text-white">Gérer l'article</h3>
+                            <button onClick={() => setEditingItem(null)} className="text-slate-400 hover:text-white transition-colors">
+                                <X className="h-6 w-6" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <h4 className="text-lg font-medium text-white mb-1">{editingItem.name}</h4>
+                                <p className="text-sm text-slate-400">{editingItem.production} • {editingItem.department}</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-400 uppercase mb-1">Quantité</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={editForm.quantity}
+                                        onChange={(e) => setEditForm(prev => ({ ...prev, quantity: parseInt(e.target.value) || 0 }))}
+                                        className="w-full bg-cinema-800 border border-cinema-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-400 uppercase mb-1">Prix Unitaire (€)</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={editForm.price}
+                                        onChange={(e) => setEditForm(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                                        className="w-full bg-cinema-800 border border-cinema-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-6 border-t border-cinema-700 bg-cinema-800/50 flex justify-between items-center">
+                            <button
+                                onClick={handleDelete}
+                                className="text-red-400 hover:text-red-300 flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg hover:bg-red-500/10 transition-colors"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                                Supprimer
+                            </button>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setEditingItem(null)}
+                                    className="px-4 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-cinema-700 transition-colors"
+                                >
+                                    Annuler
+                                </button>
+                                <button
+                                    onClick={handleSave}
+                                    className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors shadow-lg shadow-blue-600/20"
+                                >
+                                    <Save className="h-4 w-4" />
+                                    Enregistrer
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Department, SurplusAction } from '../types';
-import { Users, RefreshCw, GraduationCap, ShoppingBag, MessageSquare } from 'lucide-react';
+import { Users, RefreshCw, GraduationCap, ShoppingBag, MessageSquare, Film, Calendar } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 
 interface ProjectManagerProps {
@@ -11,7 +11,7 @@ interface ProjectManagerProps {
 export const ProjectManager: React.FC<ProjectManagerProps> = ({
     setActiveTab,
 }) => {
-    const { project, setProject, currentDept, setCurrentDept, setCircularView } = useProject();
+    const { project, setProject, currentDept, setCurrentDept, setCircularView, buyBackItems, socialPosts, userProfiles, user } = useProject();
 
     // Filter items based on current view (Department vs Production)
     const filteredItems = currentDept === 'PRODUCTION'
@@ -31,7 +31,8 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({
                     <select
                         value={currentDept}
                         onChange={(e) => setCurrentDept(e.target.value)}
-                        className="bg-transparent text-white font-medium focus:outline-none cursor-pointer"
+                        disabled={user?.department !== 'PRODUCTION'}
+                        className={`bg-transparent text-white font-medium focus:outline-none ${user?.department === 'PRODUCTION' ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'}`}
                     >
                         <option value="PRODUCTION">VUE PRODUCTION (Admin)</option>
                         <option disabled>──────────</option>
@@ -39,6 +40,55 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({
                             <option key={dept} value={dept}>{dept}</option>
                         ))}
                     </select>
+                </div>
+            </div>
+
+            {/* Shooting Dates Banner */}
+            <div className="bg-gradient-to-r from-cinema-800 to-cinema-900 rounded-xl p-6 border border-cinema-700 shadow-lg flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="flex items-center gap-4">
+                    <div className="p-3 bg-blue-500/20 rounded-full">
+                        <Calendar className="h-6 w-6 text-blue-400" />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-white">Dates de Tournage</h3>
+                        <p className="text-slate-400 text-sm">Période officielle de production</p>
+                    </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-4 bg-black/20 p-4 rounded-lg border border-white/5">
+                    <div className="flex items-center gap-3">
+                        <span className="text-slate-400 text-sm uppercase font-bold">Début</span>
+                        {user?.department === 'PRODUCTION' ? (
+                            <input
+                                type="date"
+                                value={project.shootingStartDate || ''}
+                                onChange={(e) => setProject(prev => ({ ...prev, shootingStartDate: e.target.value }))}
+                                className="bg-cinema-800 border border-cinema-600 rounded px-3 py-1 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            />
+                        ) : (
+                            <span className="text-white font-mono bg-cinema-800 px-3 py-1 rounded border border-cinema-700">
+                                {project.shootingStartDate ? new Date(project.shootingStartDate).toLocaleDateString('fr-FR') : 'Non défini'}
+                            </span>
+                        )}
+                    </div>
+
+                    <div className="hidden sm:block w-8 h-0.5 bg-cinema-600"></div>
+
+                    <div className="flex items-center gap-3">
+                        <span className="text-slate-400 text-sm uppercase font-bold">Fin</span>
+                        {user?.department === 'PRODUCTION' ? (
+                            <input
+                                type="date"
+                                value={project.shootingEndDate || ''}
+                                onChange={(e) => setProject(prev => ({ ...prev, shootingEndDate: e.target.value }))}
+                                className="bg-cinema-800 border border-cinema-600 rounded px-3 py-1 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            />
+                        ) : (
+                            <span className="text-white font-mono bg-cinema-800 px-3 py-1 rounded border border-cinema-700">
+                                {project.shootingEndDate ? new Date(project.shootingEndDate).toLocaleDateString('fr-FR') : 'Non défini'}
+                            </span>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -57,39 +107,7 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({
                     <p className="text-xs mt-2 opacity-70">Cliquez pour voir l'inventaire</p>
                 </button>
 
-                <button
-                    onClick={() => {
-                        if (setActiveTab) setActiveTab('circular');
-                        if (setCircularView) setCircularView('marketplace');
-                    }}
-                    className="bg-cinema-800 p-6 rounded-xl text-white shadow-lg border border-cinema-700 text-left hover:bg-cinema-700 transition-colors group"
-                >
-                    <div className="flex justify-between items-start">
-                        <h3 className="text-lg font-semibold opacity-70">Stock Virtuel</h3>
-                        <RefreshCw className="h-6 w-6 text-blue-400 group-hover:animate-spin" />
-                    </div>
-                    <p className="text-4xl font-bold mt-2 text-blue-400">
-                        {project.items.filter(i => i.surplusAction === SurplusAction.MARKETPLACE).length}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1">Articles en réemploi</p>
-                </button>
 
-                <button
-                    onClick={() => {
-                        if (setActiveTab) setActiveTab('circular');
-                        if (setCircularView) setCircularView('donations');
-                    }}
-                    className="bg-cinema-800 p-6 rounded-xl text-white shadow-lg border border-cinema-700 text-left hover:bg-cinema-700 transition-colors group"
-                >
-                    <div className="flex justify-between items-start">
-                        <h3 className="text-lg font-semibold opacity-70">Don Pédagogique</h3>
-                        <GraduationCap className="h-6 w-6 text-purple-400 group-hover:bounce" />
-                    </div>
-                    <p className="text-4xl font-bold mt-2 text-purple-400">
-                        {project.items.filter(i => i.surplusAction === SurplusAction.DONATION).length}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1">Distribué aux écoles</p>
-                </button>
                 <button
                     onClick={() => setActiveTab && setActiveTab('buyback')}
                     className="bg-cinema-800 p-6 rounded-xl text-white shadow-lg border border-cinema-700 text-left hover:bg-cinema-700 transition-colors group"
@@ -99,7 +117,7 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({
                         <ShoppingBag className="h-6 w-6 text-yellow-400 group-hover:scale-110 transition-transform" />
                     </div>
                     <p className="text-4xl font-bold mt-2 text-yellow-400">
-                        {project.buyBackItems?.filter(i => i.status === 'AVAILABLE').length || 0}
+                        {buyBackItems?.filter(i => i.status === 'AVAILABLE').length || 0}
                     </p>
                     <p className="text-xs text-slate-400 mt-1">Zone de réemploi interne</p>
                 </button>
@@ -112,7 +130,7 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({
                         <MessageSquare className="h-6 w-6 text-pink-500 group-hover:scale-110 transition-transform" />
                     </div>
                     <p className="text-4xl font-bold mt-2 text-pink-500">
-                        {project.socialPosts?.length || 0}
+                        {socialPosts?.length || 0}
                     </p>
                     <p className="text-xs text-slate-400 mt-1">Chat & Photos d'équipe</p>
                 </button>
@@ -126,7 +144,7 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({
                             <Users className="h-6 w-6 text-green-400 group-hover:scale-110 transition-transform" />
                         </div>
                         <p className="text-4xl font-bold mt-2 text-green-400">
-                            {project.userProfiles?.length || 0}
+                            {userProfiles?.length || 0}
                         </p>
                         <p className="text-xs text-slate-400 mt-1">Annuaire & Fiches</p>
                     </button>

@@ -46,6 +46,8 @@ export interface Project {
   name: string;
   productionCompany: string;
   startDate: string;
+  shootingStartDate?: string;
+  shootingEndDate?: string;
   status: 'Pre-Prod' | 'Shooting' | 'Wrap';
   items: ConsumableItem[];
 }
@@ -109,7 +111,7 @@ export interface UserProfile {
   id: string; // Linked to User email or ID
   email: string;
   department: Department | 'PRODUCTION';
-  
+
   // Personal Info
   firstName: string;
   lastName: string;
@@ -119,7 +121,7 @@ export interface UserProfile {
   city: string;
   phone: string;
   familyStatus: string; // Situation familiale
-  
+
   // Admin Info
   ssn: string; // Numéro de sécurité sociale
   birthPlace: string;
@@ -128,16 +130,16 @@ export interface UserProfile {
   birthCountry: string;
   nationality: string;
   socialSecurityCenterAddress: string;
-  
+
   // Emergency Contact
   emergencyContactName: string;
   emergencyContactPhone: string;
-  
+
   // Professional Info
   isRetired: boolean;
   congeSpectacleNumber: string;
   lastMedicalVisit: string;
-  
+
   // Documents (Base64 or URL)
   rib?: string;
   cmbCard?: string;

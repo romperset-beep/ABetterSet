@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useProject } from '../context/ProjectContext';
 import { Department } from '../types';
-import { ShoppingBag, Tag, Euro, User, CheckSquare, Square, Plus, Image as ImageIcon } from 'lucide-react';
+import { ShoppingBag, Tag, Euro, User, CheckSquare, Square, Plus, Image as ImageIcon, X } from 'lucide-react';
 import { SellItemModal } from './SellItemModal';
 
 export const BuyBackMarketplace: React.FC = () => {
     const { buyBackItems, toggleBuyBackReservation, user, currentDept } = useProject();
     const [isSellModalOpen, setIsSellModalOpen] = useState(false);
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
     if (!buyBackItems) {
         return <div className="p-8 text-center text-red-400">Erreur de chargement des données (buyBackItems manquant). Veuillez rafraîchir la page.</div>;
@@ -70,16 +71,20 @@ export const BuyBackMarketplace: React.FC = () => {
                     </div>
                 ) : (
                     sortedItems.map(item => (
-                        <div 
-                            key={item.id} 
-                            className={`bg-cinema-800 rounded-xl border overflow-hidden transition-all hover:border-yellow-500/30 group ${
-                                item.status === 'RESERVED' ? 'border-yellow-500/50 opacity-75' : 'border-cinema-700'
-                            }`}
+                        <div
+                            key={item.id}
+                            className={`bg-cinema-800 rounded-xl border overflow-hidden transition-all hover:border-yellow-500/30 group ${item.status === 'RESERVED' ? 'border-yellow-500/50 opacity-75' : 'border-cinema-700'
+                                }`}
                         >
                             {/* Image Area */}
                             <div className="aspect-video bg-cinema-900 relative overflow-hidden">
                                 {item.photo ? (
-                                    <img src={item.photo} alt={item.name} className="w-full h-full object-cover" />
+                                    <button
+                                        onClick={() => setSelectedImage(item.photo!)}
+                                        className="w-full h-full cursor-zoom-in"
+                                    >
+                                        <img src={item.photo} alt={item.name} className="w-full h-full object-cover transition-transform hover:scale-105 duration-500" />
+                                    </button>
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center text-slate-600">
                                         <ImageIcon className="h-12 w-12" />
@@ -126,13 +131,12 @@ export const BuyBackMarketplace: React.FC = () => {
                                     <button
                                         onClick={() => toggleBuyBackReservation(item.id, user?.department || 'PRODUCTION')}
                                         disabled={item.status === 'RESERVED' && item.reservedBy !== user?.department && user?.department !== 'PRODUCTION'}
-                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                                            item.status === 'RESERVED'
-                                                ? item.reservedBy === user?.department
-                                                    ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 hover:bg-yellow-500/30' // Reserved by me -> Click to unreserve
-                                                    : 'bg-cinema-900 text-slate-500 cursor-not-allowed' // Reserved by others
-                                                : 'bg-cinema-700 hover:bg-yellow-500 hover:text-black text-white' // Available
-                                        }`}
+                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${item.status === 'RESERVED'
+                                            ? item.reservedBy === user?.department
+                                                ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 hover:bg-yellow-500/30' // Reserved by me -> Click to unreserve
+                                                : 'bg-cinema-900 text-slate-500 cursor-not-allowed' // Reserved by others
+                                            : 'bg-cinema-700 hover:bg-yellow-500 hover:text-black text-white' // Available
+                                            }`}
                                     >
                                         {item.status === 'RESERVED' ? (
                                             <>
@@ -154,6 +158,26 @@ export const BuyBackMarketplace: React.FC = () => {
             </div>
 
             <SellItemModal isOpen={isSellModalOpen} onClose={() => setIsSellModalOpen(false)} />
+
+            {/* Full Screen Image Modal */}
+            {selectedImage && (
+                <div
+                    className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-sm animate-in fade-in duration-200 p-4"
+                    onClick={() => setSelectedImage(null)}
+                >
+                    <button
+                        onClick={() => setSelectedImage(null)}
+                        className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors"
+                    >
+                        <X className="h-8 w-8" />
+                    </button>
+                    <img
+                        src={selectedImage}
+                        alt="Full screen"
+                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
+                    />
+                </div>
+            )}
         </div>
     );
 };

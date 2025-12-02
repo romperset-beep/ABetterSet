@@ -14,13 +14,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
 
   // Define all possible menu items
   const allMenuItems = [
-    { id: 'dashboard', label: 'Tableau de Bord', icon: LayoutDashboard, allowed: ['PRODUCTION'] },
+    { id: 'dashboard', label: 'Tableau de Bord', icon: LayoutDashboard, allowed: ['ALL'] },
     { id: 'inventory', label: 'Stock & Achats', icon: Package, allowed: ['ALL'] },
     { id: 'circular', label: 'Économie Circulaire', icon: Recycle, allowed: ['ALL'] },
     { id: 'report', label: 'Rapport RSE', icon: FileText, allowed: ['PRODUCTION'] },
     { id: 'expenses', label: 'Notes de frais', icon: Receipt, ShoppingBag, MessageSquare, allowed: ['ALL'] },
-        { id: 'buyback', label: 'Zone de Rachat', icon: ShoppingBag, MessageSquare, allowed: ['ALL'] },
-        { id: 'social', label: 'Mur Social', icon: MessageSquare, allowed: ['ALL'] },
+    { id: 'buyback', label: 'Zone de Rachat', icon: ShoppingBag, MessageSquare, allowed: ['ALL'] },
+    { id: 'social', label: 'Mur Social', icon: MessageSquare, allowed: ['ALL'] },
     { id: 'global-stock', label: 'Stock Global', icon: Globe, allowed: ['PRODUCTION'] },
   ];
 
