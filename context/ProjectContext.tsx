@@ -1,30 +1,42 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Project, Department, ItemStatus, SurplusAction, ExpenseReport, ExpenseStatus, BuyBackItem, SocialPost, UserProfile, Language } from '../types';
-import { TRANSLATIONS } from './translations';
-
-// --- Types ---
-
-export interface User {
-  name: string;
-  email: string;
-  department: Department | 'PRODUCTION';
-  productionName: string;
-  filmTitle: string;
-}
-
-export interface Notification {
-  id: string;
-  type: 'ORDER' | 'STOCK_MOVE' | 'INFO';
-  message: string;
-  date: Date;
-  read: boolean;
-  targetDept?: Department | 'PRODUCTION'; // Who should see this
-  itemId?: string;
-}
+import { 
+  Project, 
+  User, 
+  Notification, 
+  Department, 
+  ExpenseReport, 
+  ExpenseStatus, 
+  BuyBackItem, 
+  SocialPost, 
+  UserProfile, 
+  Language,
+  ConsumableItem,
+  ItemStatus,
+  SurplusAction
+} from '../types';
+import { TRANSLATIONS } from '../translations';
+import { db } from '../services/firebase';
+import { 
+  collection, 
+  doc, 
+  onSnapshot, 
+  updateDoc, 
+  addDoc, 
+  setDoc, 
+  query, 
+  orderBy,
+  arrayUnion
+} from 'firebase/firestore';
 
 interface ProjectContextType {
   project: Project;
   setProject: React.Dispatch<React.SetStateAction<Project>>;
+  
+  // Firestore Actions
+  addItem: (item: ConsumableItem) => Promise<void>;
+  updateItem: (item: ConsumableItem) => Promise<void>;
+  deleteItem: (itemId: string) => Promise<void>;
+
   currentDept: string;
   setCurrentDept: (dept: string) => void;
   circularView: 'overview' | 'marketplace' | 'donations';
@@ -60,24 +72,16 @@ interface ProjectContextType {
   t: (key: string) => string;
 }
 
-// --- Mock Data ---
-
-const MOCK_PROJECT: Project = {
-  id: 'p1',
+const DEFAULT_PROJECT: Project = {
+  id: 'default-project',
   name: 'CinéStock Demo',
   productionCompany: 'Horizon Productions',
   startDate: '2023-10-15',
   shootingStartDate: '2023-11-01',
   shootingEndDate: '2023-12-20',
   status: 'Shooting',
-  items: [
-    { id: '1', name: 'Gaffer Tape', quantityInitial: 10, quantityCurrent: 2, unit: 'rouleaux', status: ItemStatus.USED, department: Department.CAMERA, surplusAction: SurplusAction.NONE, purchased: true },
-    { id: '2', name: 'Piles AA', quantityInitial: 50, quantityCurrent: 50, unit: 'unités', status: ItemStatus.NEW, department: Department.SON, surplusAction: SurplusAction.NONE, purchased: true },
-    { id: '3', name: 'Projecteur LED', quantityInitial: 2, quantityCurrent: 2, unit: 'unités', status: ItemStatus.NEW, department: Department.LUMIERE, surplusAction: SurplusAction.MARKETPLACE, purchased: true },
-  ]
+  items: []
 };
-
-// --- Context ---
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
@@ -88,19 +92,72 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [project, setProject] = useState<Project>(MOCK_PROJECT);
-  const [currentDept, setCurrentDept] = useState<string>('PRODUCTION'); // Default view
+  const [project, setProject] = useState<Project>(DEFAULT_PROJECT);
+  const [currentDept, setCurrentDept] = useState<string>('PRODUCTION');
   const [circularView, setCircularView] = useState<'overview' | 'marketplace' | 'donations'>('overview');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [expenseReports, setExpenseReports] = useState<ExpenseReport[]>([]);
   const [language, setLanguage] = useState<Language>('fr');
+  const [buyBackItems, setBuyBackItems] = useState<BuyBackItem[]>([]);
+  const [socialPosts, setSocialPosts] = useState<SocialPost[]>([]);
+  const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
 
   const t = (key: string): string => {
     // @ts-ignore
     return TRANSLATIONS[language][key] || key;
   };
 
-  const [buyBackItems, setBuyBackItems] = useState<BuyBackItem[]>([]);
+  // --- Firestore Sync ---
+
+  // 1. Sync Project Items
+  useEffect(() => {
+    // Listen to the 'items' subcollection of the project
+    // For simplicity in this demo, we use a fixed project ID 'demo-project'
+    const projectId = 'demo-project'; 
+    const itemsRef = collection(db, 'projects', projectId, 'items');
+    
+    const unsubscribe = onSnapshot(itemsRef, (snapshot) => {
+      const items: ConsumableItem[] = [];
+      snapshot.forEach((doc) => {
+        items.push({ id: doc.id, ...doc.data() } as ConsumableItem);
+      });
+      
+      setProject(prev => ({ ...prev, items }));
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Firestore Actions
+  const addItem = async (item: ConsumableItem) => {
+    const projectId = 'demo-project';
+    const itemsRef = collection(db, 'projects', projectId, 'items');
+    // Remove id if present to let Firestore generate one
+    const { id, ...itemData } = item; 
+    await addDoc(itemsRef, itemData);
+    
+    addNotification(
+      `Nouvel article ajouté : ${item.name}`,
+      'INFO',
+      item.department
+    );
+  };
+
+  const updateItem = async (item: ConsumableItem) => {
+    if (!item.id) return;
+    const projectId = 'demo-project';
+    const itemRef = doc(db, 'projects', projectId, 'items', item.id);
+    const { id, ...itemData } = item;
+    await updateDoc(itemRef, itemData);
+  };
+
+  const deleteItem = async (itemId: string) => {
+    // Implementation for delete would go here
+    // await deleteDoc(doc(db, 'projects', 'demo-project', 'items', itemId));
+  };
+
+
+  // --- Legacy Local State Actions (To be migrated) ---
 
   const addBuyBackItem = (item: BuyBackItem) => {
     setBuyBackItems(prev => [item, ...prev]);
@@ -114,45 +171,33 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
   const toggleBuyBackReservation = (itemId: string, department: Department | 'PRODUCTION') => {
     setBuyBackItems(prev => prev.map(item => {
       if (item.id === itemId) {
-        // If already reserved by this dept, unreserve
         if (item.reservedBy === department) {
           return { ...item, reservedBy: null, status: 'AVAILABLE' };
         }
-        // If reserved by someone else, do nothing (or error? UI should prevent this)
         if (item.reservedBy) return item;
-
-        // Reserve
         return { ...item, reservedBy: department, status: 'RESERVED' };
       }
       return item;
     }));
   };
 
-
-  // Sync currentDept with User's department on login
-  // Sync currentDept and Project Details with User's login info
   useEffect(() => {
     if (user) {
       setCurrentDept(user.department);
-      setProject(prev => ({
-        ...prev,
-        name: user.filmTitle,
-        productionCompany: user.productionName
-      }));
+      // We don't overwrite project name from user anymore, we trust Firestore
     }
   }, [user]);
 
   const login = (userData: User) => {
     setUser(userData);
     localStorage.setItem('cineStockUser', JSON.stringify(userData));
-    // Welcome notification
     addNotification(`Bienvenue ${userData.name} !`, 'INFO', userData.department);
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem('cineStockUser');
-    setCurrentDept('PRODUCTION'); // Reset to default
+    setCurrentDept('PRODUCTION');
   };
 
   const addNotification = (message: string, type: Notification['type'], target: Department | 'PRODUCTION' = 'PRODUCTION', itemId?: string) => {
@@ -189,27 +234,20 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     setExpenseReports(prev => prev.map(r => r.id === id ? { ...r, status } : r));
   };
 
-  // Filter notifications for the current user
   const userNotifications = notifications.filter(n => {
     if (!user) return false;
-    if (user.department === 'PRODUCTION' || user.department === 'Régie') return true; // Prod and Régie see everything
+    if (user.department === 'PRODUCTION' || user.department === 'Régie') return true;
     return n.targetDept === user.department || n.targetDept === undefined;
   });
-
-
-  const [socialPosts, setSocialPosts] = useState<SocialPost[]>([]);
 
   const addSocialPost = (post: SocialPost) => {
     setSocialPosts(prev => [post, ...prev]);
     addNotification(
       `Nouveau message de ${post.authorName} sur le mur social`,
       'INFO',
-      'PRODUCTION' // Or ALL? For now let's say Production gets notified, or everyone?
+      'PRODUCTION'
     );
   };
-
-
-  const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
 
   const updateUserProfile = (profile: UserProfile) => {
     setUserProfiles(prev => {
@@ -237,6 +275,9 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     <ProjectContext.Provider value={{
       project,
       setProject,
+      addItem,
+      updateItem,
+      deleteItem,
       currentDept,
       setCurrentDept,
       circularView,
