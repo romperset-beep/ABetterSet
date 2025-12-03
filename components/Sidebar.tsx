@@ -1,5 +1,18 @@
 import React from 'react';
-import { LayoutDashboard, Package, Recycle, Settings, Leaf, FileText, X, Globe, Receipt, ShoppingBag, MessageSquare } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Package,
+  Globe,
+  RefreshCw,
+  FileText,
+  ShoppingBag,
+  MessageSquare,
+  Users,
+  FileBarChart,
+  UserCircle,
+  LogOut,
+  X
+} from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 
 interface SidebarProps {
@@ -10,24 +23,26 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen = false, onClose }) => {
-  const { user } = useProject();
+  const { user, logout, t } = useProject();
 
   // Define all possible menu items
   const allMenuItems = [
-    { id: 'dashboard', label: 'Tableau de Bord', icon: LayoutDashboard, allowed: ['ALL'] },
-    { id: 'inventory', label: 'Stock & Achats', icon: Package, allowed: ['ALL'] },
-    { id: 'circular', label: 'Économie Circulaire', icon: Recycle, allowed: ['ALL'] },
-    { id: 'report', label: 'Rapport RSE', icon: FileText, allowed: ['PRODUCTION'] },
-    { id: 'expenses', label: 'Notes de frais', icon: Receipt, ShoppingBag, MessageSquare, allowed: ['ALL'] },
-    { id: 'buyback', label: 'Zone de Rachat', icon: ShoppingBag, MessageSquare, allowed: ['ALL'] },
-    { id: 'social', label: 'Mur Social', icon: MessageSquare, allowed: ['ALL'] },
-    { id: 'global-stock', label: 'Stock Global', icon: Globe, allowed: ['PRODUCTION'] },
+    { id: 'dashboard', label: t('sidebar.dashboard'), icon: LayoutDashboard, allowed: ['ALL'] },
+    { id: 'inventory', label: t('sidebar.inventory'), icon: Package, allowed: ['ALL'] },
+    { id: 'global-stock', label: t('sidebar.globalStock'), icon: Globe, allowed: ['ALL'] },
+    { id: 'circular', label: t('sidebar.circular'), icon: RefreshCw, allowed: ['ALL'] },
+    { id: 'expenses', label: t('sidebar.expenses'), icon: FileText, allowed: ['ALL'] },
+    { id: 'buyback', label: t('sidebar.buyback'), icon: ShoppingBag, allowed: ['ALL'] },
+    { id: 'social', label: t('sidebar.social'), icon: MessageSquare, allowed: ['ALL'] },
+    { id: 'team', label: t('sidebar.team'), icon: Users, allowed: ['ALL'] },
+    { id: 'report', label: t('sidebar.report'), icon: FileBarChart, allowed: ['PRODUCTION', 'Régie'] },
   ];
 
   // Filter based on user role
   const menuItems = allMenuItems.filter(item => {
     if (item.allowed.includes('ALL')) return true;
     if (user?.department === 'PRODUCTION' && item.allowed.includes('PRODUCTION')) return true;
+    if (user?.department === 'Régie' && item.allowed.includes('Régie')) return true;
     return false;
   });
 
@@ -85,13 +100,32 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
         </nav>
 
         <div className="p-4 border-t border-cinema-700">
-          <div className="bg-cinema-800 rounded-lg p-4 text-xs text-slate-400">
+          <div className="bg-cinema-800 rounded-lg p-4 text-xs text-slate-400 mb-4">
             <p className="font-semibold text-slate-200 mb-1">Statut Production</p>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-eco-500 animate-pulse"></span>
               Tournage en cours
             </div>
           </div>
+
+          <button
+            onClick={() => setActiveTab('profile')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 mb-2 ${activeTab === 'profile'
+                ? 'bg-eco-600 text-white shadow-lg shadow-eco-900/20'
+                : 'text-slate-400 hover:bg-cinema-700 hover:text-white'
+              }`}
+          >
+            <UserCircle className="h-5 w-5" />
+            <span className="font-medium">{t('sidebar.profile')}</span>
+          </button>
+
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200"
+          >
+            <LogOut className="h-5 w-5" />
+            <span className="font-medium">{t('sidebar.logout')}</span>
+          </button>
         </div>
       </aside>
     </>

@@ -1,4 +1,6 @@
 
+export type Language = 'fr' | 'en' | 'es';
+
 export enum Department {
   CAMERA = 'Caméra',
   LUMIERE = 'Lumière',

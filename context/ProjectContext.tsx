@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Project, Department, ItemStatus, SurplusAction, ExpenseReport, ExpenseStatus, BuyBackItem, SocialPost, UserProfile } from '../types';
+import { Project, Department, ItemStatus, SurplusAction, ExpenseReport, ExpenseStatus, BuyBackItem, SocialPost, UserProfile, Language } from '../types';
+import { TRANSLATIONS } from './translations';
 
 // --- Types ---
 
@@ -52,6 +53,11 @@ interface ProjectContextType {
   addSocialPost: (post: SocialPost) => void;
   userProfiles: UserProfile[];
   updateUserProfile: (profile: UserProfile) => void;
+
+  // Language
+  language: Language;
+  setLanguage: (lang: Language) => void;
+  t: (key: string) => string;
 }
 
 // --- Mock Data ---
@@ -87,6 +93,12 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [circularView, setCircularView] = useState<'overview' | 'marketplace' | 'donations'>('overview');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [expenseReports, setExpenseReports] = useState<ExpenseReport[]>([]);
+  const [language, setLanguage] = useState<Language>('fr');
+
+  const t = (key: string): string => {
+    // @ts-ignore
+    return TRANSLATIONS[language][key] || key;
+  };
 
   const [buyBackItems, setBuyBackItems] = useState<BuyBackItem[]>([]);
 
@@ -246,7 +258,10 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       socialPosts,
       addSocialPost,
       userProfiles,
-      updateUserProfile
+      updateUserProfile,
+      language,
+      setLanguage,
+      t
     }}>
       {children}
     </ProjectContext.Provider>
