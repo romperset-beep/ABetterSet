@@ -123,6 +123,13 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       });
       
       setProject(prev => ({ ...prev, items }));
+    }, (error) => {
+      console.error("Firestore Error:", error);
+      // We need to use a timeout or similar because addNotification isn't defined yet in this scope?
+      // Actually addNotification is defined below. We should move it up or use a ref.
+      // For now let's just log. The UI will show empty list which is a hint.
+      // Better: set a state.
+      alert(`Erreur de connexion à la base de données : ${error.message}. Vérifiez vos règles de sécurité Firestore.`);
     });
 
     return () => unsubscribe();
