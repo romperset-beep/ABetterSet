@@ -1,18 +1,18 @@
 import React from 'react';
-import { 
-  LayoutDashboard, 
-  Package, 
-  ShoppingBag, 
-  Recycle, 
-  FileText, 
-  Settings, 
+import {
+  LayoutDashboard,
+  Package,
+  ShoppingBag,
+  Recycle,
+  FileText,
+  Settings,
   LogOut,
   Users,
   MessageSquare,
   Euro
 } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
-import { useTranslation } from 'react-i18next';
+
 
 interface SidebarProps {
   activeTab: string;
@@ -22,26 +22,25 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, onClose }) => {
-  const { currentDept, logout, unreadCount, user } = useProject();
-  const { t } = useTranslation();
+  const { currentDept, logout, unreadCount, user, t } = useProject();
 
   const menuItems = [
-    { id: 'dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
-    { id: 'inventory', label: t('nav.inventory'), icon: Package },
-    { id: 'marketplace', label: t('nav.marketplace'), icon: ShoppingBag },
-    { id: 'donations', label: t('nav.donations'), icon: Recycle },
-    { id: 'reports', label: t('nav.reports'), icon: FileText },
-    { id: 'expenses', label: t('nav.expenses'), icon: Euro },
-    { id: 'social', label: t('nav.social'), icon: MessageSquare },
-    { id: 'team', label: t('nav.team'), icon: Users },
-    { id: 'settings', label: t('nav.settings'), icon: Settings },
+    { id: 'dashboard', label: t('sidebar.dashboard'), icon: LayoutDashboard },
+    { id: 'inventory', label: t('sidebar.inventory'), icon: Package },
+    { id: 'marketplace', label: t('sidebar.marketplace'), icon: ShoppingBag },
+    { id: 'donations', label: t('sidebar.donations'), icon: Recycle },
+    { id: 'reports', label: t('sidebar.report'), icon: FileText },
+    { id: 'expenses', label: t('sidebar.expenses'), icon: Euro },
+    { id: 'social', label: t('sidebar.social'), icon: MessageSquare },
+    { id: 'team', label: t('sidebar.team'), icon: Users },
+    { id: 'settings', label: t('sidebar.profile'), icon: Settings },
   ];
 
   // Filter items based on department
   const filteredItems = menuItems.filter(item => {
     if (item.id === 'settings') return true;
     if (item.id === 'social') return true;
-    
+
     // Production sees everything
     if (currentDept === 'PRODUCTION' || currentDept === 'Régie') return true;
 
@@ -60,7 +59,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, onCl
     <>
       {/* Mobile Overlay */}
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 md:hidden"
           onClick={onClose}
         />
@@ -83,7 +82,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, onCl
           {filteredItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
-            
+
             return (
               <button
                 key={item.id}
@@ -91,11 +90,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, onCl
                   setActiveTab(item.id);
                   if (onClose) onClose();
                 }}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
-                  isActive 
-                    ? 'bg-emerald-600 text-white' 
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                }`}
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${isActive
+                  ? 'bg-emerald-600 text-white'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  }`}
               >
                 <Icon size={20} />
                 <span className="font-medium">{item.label}</span>
@@ -115,7 +113,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, onCl
             className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-red-900/20 hover:text-red-400 transition-colors"
           >
             <LogOut size={20} />
-            <span className="font-medium">{t('nav.logout')}</span>
+            <span className="font-medium">{t('sidebar.logout')}</span>
           </button>
 
           {/* Connection Status Indicator - Now in flow */}
