@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Project, ImpactMetrics } from '../types';
 import { generateEcoImpactReport } from '../services/geminiService';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Loader2, Award, Leaf, DollarSign, Building } from 'lucide-react';
+import { Loader2, Award, Leaf, DollarSign, Building, Share2, Download } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 interface ImpactReportProps {
     project: Project;
@@ -37,6 +39,53 @@ export const ImpactReport: React.FC<ImpactReportProps> = ({ project }) => {
         { name: 'CO2 économisé (kg)', value: metrics.co2SavedKg, color: '#10b981' },
     ] : [];
 
+    const handleShare = async () => {
+        const element = document.getElementById('impact-report-content');
+        if (!element) return;
+
+        try {
+            setLoading(true);
+            const canvas = await html2canvas(element, {
+                scale: 2,
+                backgroundColor: '#0f172a', // Match app background
+            });
+
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4',
+            });
+
+            const imgProps = pdf.getImageProperties(imgData);
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+
+            const fileName = `Rapport_RSE_${project.name.replace(/\s+/g, '_')}.pdf`;
+
+            // Mobile Share
+            if (navigator.share) {
+                const blob = pdf.output('blob');
+                const file = new File([blob], fileName, { type: 'application/pdf' });
+                await navigator.share({
+                    title: `Rapport RSE - ${project.name}`,
+                    text: `Voici le rapport d'impact écologique pour le projet ${project.name}.`,
+                    files: [file],
+                });
+            } else {
+                // Desktop Download
+                pdf.save(fileName);
+            }
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            alert('Erreur lors de la génération du PDF.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     if (!project.items.some(i => i.quantityCurrent > 0)) {
         return (
             <div className="flex flex-col items-center justify-center h-96 text-slate-500">
@@ -60,10 +109,19 @@ export const ImpactReport: React.FC<ImpactReportProps> = ({ project }) => {
                         <span className="text-sm font-medium">Analyse IA en cours...</span>
                     </div>
                 )}
+                {!loading && metrics && (
+                    <button
+                        onClick={handleShare}
+                        className="flex items-center gap-2 bg-eco-600 hover:bg-eco-500 text-white px-4 py-2 rounded-lg shadow-lg transition-colors"
+                    >
+                        <Share2 className="h-4 w-4" />
+                        <span className="hidden md:inline">Partager / PDF</span>
+                    </button>
+                )}
             </header>
 
             {metrics && !loading && (
-                <>
+                <div id="impact-report-content" className="space-y-8 p-4 -m-4">
                     <div className="bg-gradient-to-r from-eco-900 to-cinema-900 rounded-2xl p-8 border border-eco-800 relative overflow-hidden">
                         <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-eco-500 blur-[100px] opacity-20"></div>
 
@@ -156,7 +214,7 @@ export const ImpactReport: React.FC<ImpactReportProps> = ({ project }) => {
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
-                </>
+                </div>
             )}
         </div>
     );
