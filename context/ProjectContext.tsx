@@ -121,11 +121,26 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         device: navigator.userAgent
       });
 
-      setDebugStatus("SUCCÈS ! Écriture réussie sur le serveur.");
+      setDebugStatus("SUCCÈS SDK ! Écriture réussie sur le serveur.");
     } catch (err: any) {
-      console.error("Test Connection Error:", err);
-      setDebugStatus(`ÉCHEC : ${err.message}`);
-      setError(err.message);
+      console.error("SDK Error:", err);
+      setDebugStatus(`ÉCHEC SDK : ${err.message}. Tentative REST API...`);
+
+      // Fallback: Test REST API directly
+      try {
+        const projectId = "studio-4995281481-cbcdb";
+        const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/_debug_connection`;
+        const response = await fetch(url);
+        if (response.ok) {
+          setDebugStatus(`ÉCHEC SDK mais SUCCÈS REST API (${response.status}). Problème SDK/WebSocket.`);
+        } else {
+          const text = await response.text();
+          setDebugStatus(`ÉCHEC TOTAL (SDK + REST ${response.status}): ${text}`);
+          setError(`REST Error: ${text}`);
+        }
+      } catch (restErr: any) {
+        setDebugStatus(`ÉCHEC TOTAL (Network): ${restErr.message}`);
+      }
     }
   };
 
