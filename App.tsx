@@ -78,6 +78,15 @@ const AppContent: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3 md:gap-6">
+            
+            {/* Connection Status (Mobile & Desktop) */}
+            <div className="hidden md:flex items-center gap-2 text-xs text-gray-400 bg-cinema-800 px-3 py-1.5 rounded-full border border-cinema-700">
+              <div className={`w-2 h-2 rounded-full ${typeof navigator !== 'undefined' && navigator.onLine ? 'bg-green-500' : 'bg-red-500'}`} />
+              <span className="hidden lg:inline">{typeof navigator !== 'undefined' && navigator.onLine ? 'En ligne' : 'Hors ligne'}</span>
+            </div>
+            {/* Mobile simplified indicator */}
+            <div className={`md:hidden w-3 h-3 rounded-full ${typeof navigator !== 'undefined' && navigator.onLine ? 'bg-green-500' : 'bg-red-500'} border border-cinema-900`} title={typeof navigator !== 'undefined' && navigator.onLine ? 'En ligne' : 'Hors ligne'} />
+
             <button
               onClick={() => setActiveTab('profile')}
               className="flex items-center gap-3 bg-cinema-800 px-3 py-1.5 rounded-full border border-cinema-700 hover:bg-cinema-700 transition-colors cursor-pointer"
@@ -85,7 +94,7 @@ const AppContent: React.FC = () => {
               <div className="bg-eco-500/20 p-1 rounded-full">
                 <UserIcon className="h-4 w-4 text-eco-400" />
               </div>
-              <div className="text-right">
+              <div className="hidden md:block text-right">
                 <p className="text-sm text-white font-medium leading-none">{user.name}</p>
                 <p className="text-[10px] text-slate-400 leading-none mt-1">{user.department}</p>
               </div>
