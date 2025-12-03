@@ -162,6 +162,8 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({
                     <p>Items Loaded: <span className="text-white">{project.items.length}</span></p>
                     <p>User: <span className="text-white">{user?.name} ({user?.department})</span></p>
                     <p>Last Render: <span className="text-white">{new Date().toLocaleTimeString()}</span></p>
+                    <p>Source: <span className="text-white">{(window as any).firestoreSource || 'Unknown'}</span></p>
+                    <p>DB Config: <span className="text-white">studio-4995...</span></p>
                 </div>
             </div>
         </div>

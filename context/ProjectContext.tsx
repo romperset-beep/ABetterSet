@@ -126,6 +126,13 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       });
 
       setProject(prev => ({ ...prev, items }));
+
+      // Debug: Check if data is from cache
+      const source = snapshot.metadata.fromCache ? "local cache" : "server";
+      console.log("Data came from " + source);
+      // We could expose this to the UI if needed
+      (window as any).firestoreSource = source;
+
     }, (error) => {
       console.error("Firestore Error:", error);
       // Only alert if we have a real project ID
