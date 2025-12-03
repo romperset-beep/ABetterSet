@@ -14,7 +14,7 @@ import {
   ItemStatus,
   SurplusAction
 } from '../types';
-
+import { TRANSLATIONS } from './translations';
 import { db } from '../services/firebase';
 import {
   collection,
@@ -103,7 +103,8 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
 
   const t = (key: string): string => {
-    return key;
+    // @ts-ignore
+    return TRANSLATIONS[language][key] || key;
   };
 
   // --- Firestore Sync ---
