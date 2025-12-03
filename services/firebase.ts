@@ -1,12 +1,20 @@
 import { initializeApp } from 'firebase/app';
-import { initializeFirestore, memoryLocalCache } from 'firebase/firestore';
+import { getFirestore, setLogLevel } from 'firebase/firestore';
 
-// ... (config remains same)
+// Your web app's Firebase configuration
+const firebaseConfig = {
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: "studio-4995281481-cbcdb.firebaseapp.com",
+    projectId: "studio-4995281481-cbcdb",
+    storageBucket: "studio-4995281481-cbcdb.firebasestorage.app",
+    messagingSenderId: "28125070596",
+    appId: "1:28125070596:web:c806ebff513ee2c63cfc51"
+};
 
-// Connect to 'cinestock-db' with robust settings:
-// 1. Memory Cache: Avoids IndexedDB corruption/blocking
-// 2. Long Polling: Avoids WebSocket blocking by firewalls/proxies
-export const db = initializeFirestore(app, {
-    localCache: memoryLocalCache(),
-    experimentalForceLongPolling: true,
-}, 'cinestock-db');
+const app = initializeApp(firebaseConfig);
+
+// Enable debug logs
+setLogLevel('debug');
+
+// Revert to simple init to fix crash, but keep named DB
+export const db = getFirestore(app, 'cinestock-db');
