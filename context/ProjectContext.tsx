@@ -299,17 +299,46 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     setCurrentDept('PRODUCTION');
   };
 
-  const addNotification = (message: string, type: Notification['type'], target: Department | 'PRODUCTION' = 'PRODUCTION', itemId?: string) => {
-    const newNotif: Notification = {
-      id: Math.random().toString(36).substr(2, 9),
-      message,
-      type,
-      date: new Date(),
-      read: false,
-      targetDept: target,
-      itemId
-    };
-    setNotifications(prev => [newNotif, ...prev]);
+  // 3. Sync Notifications
+  useEffect(() => {
+    const projectId = project.id;
+    if (!projectId || projectId === 'default-project') return;
+
+    const notifsRef = collection(db, 'projects', projectId, 'notifications');
+    const q = query(notifsRef, orderBy('date', 'desc'));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const notifs: Notification[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        notifs.push({
+          id: doc.id,
+          ...data,
+          date: data.date?.toDate ? data.date.toDate() : new Date(data.date)
+        } as Notification);
+      });
+      setNotifications(notifs);
+    });
+
+    return () => unsubscribe();
+  }, [project.id]);
+
+  const addNotification = async (message: string, type: Notification['type'], target: Department | 'PRODUCTION' = 'PRODUCTION', itemId?: string) => {
+    try {
+      const projectId = project.id;
+      const notifsRef = collection(db, 'projects', projectId, 'notifications');
+
+      await addDoc(notifsRef, {
+        message,
+        type,
+        targetDept: target,
+        itemId: itemId || null,
+        read: false,
+        date: new Date()
+      });
+    } catch (err) {
+      console.error("Failed to send notification:", err);
+    }
   };
 
   const markAsRead = (id: string) => {
