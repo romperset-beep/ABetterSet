@@ -208,17 +208,35 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Firestore Actions
   const addItem = async (item: ConsumableItem) => {
-    const projectId = project.id;
-    const itemsRef = collection(db, 'projects', projectId, 'items');
-    // Remove id if present to let Firestore generate one
-    const { id, ...itemData } = item;
-    await addDoc(itemsRef, itemData);
+    try {
+      const projectId = project.id;
+      console.log(`[AddItem] Starting add to ${projectId}`);
+      setLastLog(`[AddItem] Envoi en cours vers ${projectId}...`);
 
-    addNotification(
-      `Nouvel article ajouté : ${item.name}`,
-      'INFO',
-      item.department
-    );
+      const itemsRef = collection(db, 'projects', projectId, 'items');
+      // Remove id if present to let Firestore generate one
+      const { id, ...itemData } = item;
+
+      // Sanitize undefined values just in case
+      const sanitizedData = Object.fromEntries(
+        Object.entries(itemData).map(([k, v]) => [k, v === undefined ? null : v])
+      );
+
+      await addDoc(itemsRef, sanitizedData);
+
+      setLastLog(`[AddItem] SUCCÈS ! Ajouté dans ${projectId}`);
+      console.log(`[AddItem] Success`);
+
+      addNotification(
+        `Nouvel article ajouté : ${item.name}`,
+        'INFO',
+        item.department
+      );
+    } catch (err: any) {
+      console.error("[AddItem] Error:", err);
+      setLastLog(`[AddItem] ERREUR: ${err.message}`);
+      setError(`Erreur d'ajout : ${err.message}`);
+    }
   };
 
   const updateItem = async (item: ConsumableItem) => {
