@@ -294,43 +294,37 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose }) =
                                     e.target.value = '';
 
                                     setLoadingSuggestion(true);
-                                    try {
-                                        const { items, rawResponse } = await analyzeOrderFile(file);
+                                    const { items, rawResponse } = await analyzeOrderFile(file);
 
-                                        if (items.length > 0) {
-                                            // Add all items found
-                                            items.forEach(item => {
-                                                if (item.name) {
-                                                    const newItem: ConsumableItem = {
-                                                        id: Math.random().toString(36).substr(2, 9),
-                                                        name: item.name,
-                                                        department: (item.department as Department) || selectedDept,
-                                                        quantityInitial: item.quantityInitial || 1,
-                                                        quantityCurrent: item.quantityInitial || 1,
-                                                        unit: item.unit || 'unités',
-                                                        status: ItemStatus.NEW,
-                                                        surplusAction: SurplusAction.NONE,
-                                                        purchased: false
-                                                    };
-                                                    setProject(prev => ({ ...prev, items: [...prev.items, newItem] }));
-                                                }
-                                            });
+                                    if (items.length > 0) {
+                                        // Add all items found
+                                        items.forEach(item => {
+                                            if (item.name) {
+                                                const newItem: ConsumableItem = {
+                                                    id: Math.random().toString(36).substr(2, 9),
+                                                    name: item.name,
+                                                    department: (item.department as Department) || selectedDept,
+                                                    quantityInitial: item.quantityInitial || 1,
+                                                    quantityCurrent: item.quantityInitial || 1,
+                                                    unit: item.unit || 'unités',
+                                                    status: ItemStatus.NEW,
+                                                    surplusAction: SurplusAction.NONE,
+                                                    purchased: false
+                                                };
+                                                setProject(prev => ({ ...prev, items: [...prev.items, newItem] }));
+                                            }
+                                        });
 
-                                            addNotification(
-                                                `Scan terminé : ${items.length} articles ajoutés par ${user?.name}`,
-                                                'ORDER',
-                                                'PRODUCTION'
-                                            );
-                                            onClose();
-                                        } else {
-                                            setError(`Aucun article identifié. Réponse brute de l'IA : ${rawResponse.substring(0, 200)}...`);
-                                        }
-                                    } catch (err: any) {
-                                        console.error(err);
-                                        setError(`Erreur technique : ${err.message || JSON.stringify(err)}`);
-                                    } finally {
-                                        setLoadingSuggestion(false);
+                                        addNotification(
+                                            `Scan terminé : ${items.length} articles ajoutés par ${user?.name}`,
+                                            'ORDER',
+                                            'PRODUCTION'
+                                        );
+                                        onClose();
+                                    } else {
+                                        setError(`Aucun article identifié. Réponse brute de l'IA : ${rawResponse.substring(0, 200)}...`);
                                     }
+                                    setLoadingSuggestion(false);
                                 }}
                             />
                         </label>
@@ -507,3 +501,4 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose }) =
         </div>
     );
 };
+```

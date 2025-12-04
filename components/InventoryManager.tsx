@@ -4,6 +4,7 @@ import { Minus, Plus, ShoppingCart, CheckCircle2, PlusCircle, RefreshCw, Graduat
 import { useProject } from '../context/ProjectContext';
 import { AddItemModal } from './AddItemModal';
 import { ExpenseReportModal } from './ExpenseReportModal';
+import { ErrorBoundary } from './ErrorBoundary';
 
 export const InventoryManager: React.FC = () => {
     const { project, setProject, currentDept, addNotification, user, markNotificationAsReadByItemId } = useProject();
@@ -19,10 +20,10 @@ export const InventoryManager: React.FC = () => {
     const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
     const [expenseItemName, setExpenseItemName] = useState<string>('');
 
-    
+
     // toggleExpenseSelection removed
 
-    
+
     const toggleExpenseSelection = (id: string) => {
         setSelectedForExpense(prev => {
             const next = new Set(prev);
@@ -35,7 +36,7 @@ export const InventoryManager: React.FC = () => {
         });
     };
 
-    
+
     const groupStockItems = (items: typeof project.items) => {
         const grouped: any[] = [];
         const newItemsByName: Record<string, any> = {};
@@ -49,11 +50,11 @@ export const InventoryManager: React.FC = () => {
             // Handle New Portion
             if (newQty > 0) {
                 if (!newItemsByName[key]) {
-                    newItemsByName[key] = { 
-                        ...item, 
-                        quantityCurrent: 0, 
+                    newItemsByName[key] = {
+                        ...item,
+                        quantityCurrent: 0,
                         quantityStarted: 0,
-                        items: [] 
+                        items: []
                     };
                 }
                 newItemsByName[key].quantityCurrent += newQty;
@@ -63,12 +64,12 @@ export const InventoryManager: React.FC = () => {
             // Handle Started Portion
             if (startedQty > 0) {
                 if (!startedItemsByName[key]) {
-                    startedItemsByName[key] = { 
-                        ...item, 
-                        quantityCurrent: 0, 
+                    startedItemsByName[key] = {
+                        ...item,
+                        quantityCurrent: 0,
                         quantityStarted: 0,
                         isStartedView: true, // Flag to identify started view
-                        items: [] 
+                        items: []
                     };
                 }
                 startedItemsByName[key].quantityCurrent += startedQty;
@@ -187,18 +188,18 @@ export const InventoryManager: React.FC = () => {
                     // Let's follow the pattern: 
                     // Original item becomes the Started portion (SHORT_FILM)
                     // New item becomes the New portion (MARKETPLACE)
-                    
+
                     // 1. Update original item (Started portion -> Short Film)
                     const updatedItems = prev.items.map(i =>
                         i.id === item.id
-                            ? { 
-                                ...i, 
-                                quantityCurrent: startedQty, 
-                                quantityInitial: startedQty, 
+                            ? {
+                                ...i,
+                                quantityCurrent: startedQty,
+                                quantityInitial: startedQty,
                                 quantityStarted: startedQty, // It is all started
                                 status: ItemStatus.USED,
                                 surplusAction: SurplusAction.SHORT_FILM // Force Short Film
-                              }
+                            }
                             : i
                     );
 
@@ -316,7 +317,7 @@ export const InventoryManager: React.FC = () => {
 
     return (
         <div className="space-y-8">
-                                                            <header className="flex justify-between items-end">
+            <header className="flex justify-between items-end">
                 <div>
                     <h2 className="text-3xl font-bold text-white">Stock & Achats</h2>
                     <p className="text-slate-400 mt-1">
@@ -354,12 +355,14 @@ export const InventoryManager: React.FC = () => {
                 </div>
             </header>
 
-            <AddItemModal
-                isOpen={isAddModalOpen}
-                onClose={() => setIsAddModalOpen(false)}
-            />
+            <ErrorBoundary>
+                <AddItemModal
+                    isOpen={isAddModalOpen}
+                    onClose={() => setIsAddModalOpen(false)}
+                />
+            </ErrorBoundary>
 
-                        <ExpenseReportModal
+            <ExpenseReportModal
                 isOpen={isExpenseModalOpen}
                 onClose={() => setIsExpenseModalOpen(false)}
                 prefillItemNames={project.items.filter(i => selectedForExpense.has(i.id)).map(i => i.name)}
@@ -493,7 +496,7 @@ export const InventoryManager: React.FC = () => {
                                     ) : (
                                         // View for Departments
                                         <div className="flex gap-2">
-                                                                                        <div className="flex items-center gap-3 bg-cinema-800/50 px-3 py-2 rounded-lg border border-cinema-700">
+                                            <div className="flex items-center gap-3 bg-cinema-800/50 px-3 py-2 rounded-lg border border-cinema-700">
                                                 <input
                                                     type="checkbox"
                                                     checked={selectedForExpense.has(item.id)}
@@ -592,17 +595,17 @@ export const InventoryManager: React.FC = () => {
                                                 {!isSurplus && item.quantityCurrent > 0 && (
                                                     <div className="flex gap-2 mr-4">
                                                         {!isStarted && (
-<button
-                                                            onClick={() => {
-                                                                const target = item.items.find(i => i.quantityCurrent > 0);
-                                                                if (target) handleSurplusClick(target, SurplusAction.MARKETPLACE);
-                                                            }}
-                                                            className="p-2 rounded-lg border border-cinema-600 text-slate-400 hover:border-blue-500 hover:text-blue-400 hover:bg-blue-500/10 transition-all"
-                                                            title="Envoyer au Stock Virtuel"
-                                                        >
-                                                            <RefreshCw className="h-4 w-4" />
-                                                        </button>
-)}
+                                                            <button
+                                                                onClick={() => {
+                                                                    const target = item.items.find(i => i.quantityCurrent > 0);
+                                                                    if (target) handleSurplusClick(target, SurplusAction.MARKETPLACE);
+                                                                }}
+                                                                className="p-2 rounded-lg border border-cinema-600 text-slate-400 hover:border-blue-500 hover:text-blue-400 hover:bg-blue-500/10 transition-all"
+                                                                title="Envoyer au Stock Virtuel"
+                                                            >
+                                                                <RefreshCw className="h-4 w-4" />
+                                                            </button>
+                                                        )}
                                                         {user?.department === 'PRODUCTION' && (
                                                             <>
                                                                 <button
@@ -633,7 +636,7 @@ export const InventoryManager: React.FC = () => {
                                                 {isSurplus && (
                                                     <button
                                                         onClick={() => {
-                                                            const target = item.items[0]; 
+                                                            const target = item.items[0];
                                                             if (target) setSurplusAction(target.id, SurplusAction.NONE);
                                                         }}
                                                         className="p-2 mr-4 rounded-lg border border-cinema-600 text-slate-500 hover:text-slate-300 hover:bg-cinema-700 transition-all"
