@@ -11,7 +11,7 @@ interface ProjectManagerProps {
 export const ProjectManager: React.FC<ProjectManagerProps> = ({
     setActiveTab,
 }) => {
-    const { project, setProject, currentDept, setCurrentDept, setCircularView, buyBackItems, socialPosts, userProfiles, user, t, error, testConnection, debugStatus } = useProject();
+    const { project, setProject, currentDept, setCurrentDept, setCircularView, buyBackItems, socialPosts, userProfiles, user, t, error, testConnection, debugStatus, lastLog } = useProject();
 
     // Filter items based on current view (Department vs Production)
     const filteredItems = currentDept === 'PRODUCTION'
