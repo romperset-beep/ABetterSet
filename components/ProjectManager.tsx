@@ -179,6 +179,10 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({
                     {debugStatus && (
                         <p className="mt-2 text-yellow-400 font-bold">{debugStatus}</p>
                     )}
+                    <div className="mt-2 pt-2 border-t border-red-900/30">
+                        <p className="text-slate-400">Dernier Log Synchro :</p>
+                        <p className="text-blue-300 font-mono break-all">{lastLog}</p>
+                    </div>
                 </div>
 
                 {error && (

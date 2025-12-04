@@ -73,6 +73,7 @@ interface ProjectContextType {
   error: string | null;
   testConnection: () => Promise<void>;
   debugStatus: string;
+  lastLog: string;
 }
 
 const DEFAULT_PROJECT: Project = {
@@ -106,6 +107,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [debugStatus, setDebugStatus] = useState<string>("");
+  const [lastLog, setLastLog] = useState<string>("En attente...");
 
   const testConnection = async () => {
     setDebugStatus("1. Test REST API en cours...");
@@ -182,8 +184,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       snapshot.forEach((doc) => {
         items.push({ id: doc.id, ...doc.data() } as ConsumableItem);
       });
-      console.log(`[ItemsSync] Parsed ${items.length} items`);
-
+      setLastLog(`[ItemsSync] Reçu ${items.length} articles (Source: ${snapshot.metadata.fromCache ? 'Cache' : 'Serveur'})`);
       setProject(prev => ({ ...prev, items }));
 
       // Debug: Check if data is from cache
@@ -492,7 +493,8 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       t,
       error,
       testConnection,
-      debugStatus
+      debugStatus,
+      lastLog
     }}>
       {children}
     </ProjectContext.Provider>
