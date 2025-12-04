@@ -363,12 +363,37 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
-  const markAsRead = (id: string) => {
+  const markAsRead = async (id: string) => {
+    // Optimistic update
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+
+    try {
+      const projectId = project.id;
+      const notifRef = doc(db, 'projects', projectId, 'notifications', id);
+      await updateDoc(notifRef, { read: true });
+    } catch (err) {
+      console.error("Failed to mark notification as read:", err);
+    }
   };
 
-  const markNotificationAsReadByItemId = (itemId: string) => {
+  const markNotificationAsReadByItemId = async (itemId: string) => {
+    // Find notifications related to this item
+    const targetNotifs = notifications.filter(n => n.itemId === itemId && !n.read);
+
+    // Optimistic update
     setNotifications(prev => prev.map(n => n.itemId === itemId ? { ...n, read: true } : n));
+
+    try {
+      const projectId = project.id;
+      // Update all matching notifications in Firestore
+      const updatePromises = targetNotifs.map(n => {
+        const notifRef = doc(db, 'projects', projectId, 'notifications', n.id);
+        return updateDoc(notifRef, { read: true });
+      });
+      await Promise.all(updatePromises);
+    } catch (err) {
+      console.error("Failed to mark notifications as read by item:", err);
+    }
   };
 
   const addExpenseReport = (report: ExpenseReport) => {
