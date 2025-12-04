@@ -30,6 +30,10 @@ const AppContent: React.FC = () => {
         return <ProjectManager setActiveTab={setActiveTab} />;
       case 'inventory':
         return <InventoryManager />;
+      case 'marketplace':
+        return <BuyBackMarketplace />;
+      case 'donations':
+        return <CircularEconomy />;
       case 'circular':
         return <CircularEconomy />;
       case 'report':
