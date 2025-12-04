@@ -105,6 +105,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose }) =
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(-1);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const suggestionsListRef = useRef<HTMLDivElement>(null);
 
     // Flatten all items for global autocomplete
