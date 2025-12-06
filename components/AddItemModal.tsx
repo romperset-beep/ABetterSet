@@ -198,7 +198,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose }) =
         // Determine final department:
         // If user is PRODUCTION (Admin) or REGIE, they can order for the selected department.
         // If user is another Department, they can only order for themselves, even if they browsed another catalog.
-        const finalDepartment = (currentDept === 'PRODUCTION' || currentDept === Department.REGIE)
+        const finalDepartment = (currentDept === 'PRODUCTION')
             ? selectedDept
             : (currentDept as Department);
 
