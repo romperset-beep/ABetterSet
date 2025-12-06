@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Department, ConsumableItem, ItemStatus, SurplusAction } from '../types';
 import { X, Plus, Leaf, List, Search, Upload, Loader2, AlertCircle } from 'lucide-react';
-import { suggestEcoAlternatives, analyzeOrderFile } from '../services/geminiService';
+import { analyzeOrderFile } from '../services/geminiService';
 import { useProject } from '../context/ProjectContext';
 
 // Popular items database for the scrolling banner
@@ -139,7 +139,6 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose }) =
         setNewItemName(name);
         setShowSuggestions(false);
         setSelectedIndex(-1);
-        handleGetEcoTip(name);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -236,19 +235,11 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose }) =
     };
 
 
-    const handleGetEcoTip = async (name?: string) => {
-        const targetName = name || newItemName;
-        if (!targetName) return;
-        setLoadingSuggestion(true);
-        const tip = await suggestEcoAlternatives(targetName);
-        setSuggestion(tip);
-        setLoadingSuggestion(false);
-    };
+
 
     const selectItemFromCatalog = (name: string) => {
         setNewItemName(name);
         setIsCatalogOpen(false);
-        handleGetEcoTip(name);
     };
 
     // Get suggestions for current department catalog
@@ -426,23 +417,10 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose }) =
                             >
                                 <List className="h-5 w-5" />
                             </button>
-                            <button
-                                onClick={() => handleGetEcoTip()}
-                                disabled={!newItemName || loadingSuggestion}
-                                className="bg-eco-600/20 hover:bg-eco-600/40 text-eco-400 px-3 rounded-lg border border-eco-600/50 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Obtenir un conseil éco-responsable"
-                            >
-                                <Leaf className="h-5 w-5" />
-                            </button>
                         </div>
                     </div>
 
-                    {suggestion && (
-                        <div className="flex items-start gap-2 text-sm text-eco-300 bg-eco-900/30 p-3 rounded border border-eco-800 animate-in fade-in slide-in-from-top-2">
-                            <Leaf className="h-4 w-4 mt-0.5 shrink-0" />
-                            <span><span className="font-bold">Conseil Éco-IA :</span> {suggestion}</span>
-                        </div>
-                    )}
+
                 </div>
 
                 {/* Footer */}
