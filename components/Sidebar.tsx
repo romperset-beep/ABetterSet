@@ -29,7 +29,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, onCl
     { id: 'inventory', label: t('sidebar.inventory'), icon: Package },
     { id: 'marketplace', label: t('sidebar.marketplace'), icon: ShoppingBag },
     { id: 'donations', label: t('sidebar.donations'), icon: Recycle },
-    { id: 'reports', label: t('sidebar.report'), icon: FileText },
+    { id: 'report', label: t('sidebar.report'), icon: FileText },
     { id: 'expenses', label: t('sidebar.expenses'), icon: Euro },
     { id: 'social', label: t('sidebar.social'), icon: MessageSquare },
     { id: 'team', label: t('sidebar.team'), icon: Users },
