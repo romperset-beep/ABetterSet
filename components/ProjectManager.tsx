@@ -102,7 +102,7 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({
                 >
                     <h3 className="text-lg font-semibold opacity-90">Mon Stock {currentDept !== 'PRODUCTION' && `(${currentDept})`}</h3>
                     <p className="text-4xl font-bold mt-2">
-                        {filteredItems.filter(i => i.purchased && (!i.surplusAction || i.surplusAction === SurplusAction.NONE)).length} <span className="text-lg opacity-50 font-normal">articles</span>
+                        {filteredItems.filter(i => i.purchased && (!i.surplusAction || i.surplusAction === SurplusAction.NONE) && i.quantityCurrent > 0).length} <span className="text-lg opacity-50 font-normal">articles</span>
                     </p>
                     <p className="text-xs mt-2 opacity-70">Cliquez pour voir l'inventaire</p>
                 </button>
