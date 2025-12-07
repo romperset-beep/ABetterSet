@@ -13,6 +13,7 @@ import { TeamDirectory } from './components/TeamDirectory';
 import { ProjectProvider, useProject } from './context/ProjectContext';
 import { LoginPage } from './components/LoginPage';
 import { ProjectSelection } from './components/ProjectSelection';
+import { FallbackErrorBoundary } from './components/FallbackErrorBoundary';
 import { Bell, LogOut, User as UserIcon, Menu } from 'lucide-react';
 import { Department } from './types';
 
@@ -39,7 +40,9 @@ const AppContent: React.FC = () => {
         </div>
 
         <div className="relative z-10 w-full flex justify-center">
-          <ProjectSelection onProjectSelected={() => { /* Context updates state */ }} />
+          <FallbackErrorBoundary>
+            <ProjectSelection onProjectSelected={() => { /* Context updates state */ }} />
+          </FallbackErrorBoundary>
         </div>
       </div>
     );
