@@ -25,23 +25,9 @@ const AppContent: React.FC = () => {
     return <LoginPage />;
   }
 
-  // Check if we need to wait for project auto-join
-  // If user has a production assigned but project is default, we are likely auto-joining
-  const isAutoJoining = user.productionName && user.filmTitle && (project.id === 'default-project' || !project.id);
-
-  // If user has NO production assigned, they MUST select one
-  const needsProjectSelection = (!user.productionName || !user.filmTitle) && (project.id === 'default-project' || !project.id);
-
-  if (isAutoJoining) {
-    return (
-      <div className="min-h-screen bg-cinema-900 flex items-center justify-center p-4">
-        <div className="text-center animate-pulse">
-          <div className="w-16 h-16 border-4 border-eco-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <h2 className="text-xl text-white font-semibold">Connexion au plateau {user.filmTitle}...</h2>
-        </div>
-      </div>
-    );
-  }
+  // If project is default/empty, we always go to selection screen
+  // The selection screen itself will handle "Welcome Back" vs "New Form" logic
+  const needsProjectSelection = project.id === 'default-project' || !project.id;
 
   if (needsProjectSelection) {
     return (

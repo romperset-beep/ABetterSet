@@ -10,20 +10,14 @@ export const ProjectSelection: React.FC<ProjectSelectionProps> = ({ onProjectSel
     const { updateProjectDetails, user, logout, joinProject } = useProject();
     const [isLoading, setIsLoading] = useState(false);
 
-    const [formData, setFormData] = useState({
-        productionName: user?.productionName || '',
-        filmTitle: user?.filmTitle || '',
-        startDate: user?.startDate || '',
-        endDate: user?.endDate || ''
-    });
+    const hasSavedProject = user?.productionName && user?.filmTitle;
+    const [view, setView] = useState<'choice' | 'form'>(hasSavedProject ? 'choice' : 'form');
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!formData.productionName || !formData.filmTitle) return;
-
+    const handleResume = async () => {
+        if (!user?.productionName || !user?.filmTitle) return;
         setIsLoading(true);
         try {
-            await joinProject(formData.productionName, formData.filmTitle, formData.startDate, formData.endDate);
+            await joinProject(user.productionName, user.filmTitle, user.startDate, user.endDate);
             onProjectSelected();
         } catch (err) {
             console.error(err);
@@ -32,18 +26,73 @@ export const ProjectSelection: React.FC<ProjectSelectionProps> = ({ onProjectSel
         }
     };
 
+    if (view === 'choice') {
+        return (
+            <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="bg-cinema-800 border border-cinema-700 p-8 rounded-2xl shadow-2xl relative z-10">
+                    <div className="text-center mb-8">
+                        <div className="w-16 h-16 bg-gradient-to-br from-eco-500 to-emerald-700 rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg">
+                            <Film className="h-8 w-8 text-white" />
+                        </div>
+                        <h2 className="text-2xl font-bold text-white mb-2">
+                            Bon retour, {user?.name.split(' ')[0]} !
+                        </h2>
+                        <p className="text-slate-400 text-sm">
+                            Voulez-vous reprendre votre travail sur ce projet ?
+                        </p>
+                    </div>
+
+                    <div className="space-y-4">
+                        <button
+                            onClick={handleResume}
+                            disabled={isLoading}
+                            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl shadow-lg flex items-center justify-between px-6 transition-all transform hover:scale-[1.02] group"
+                        >
+                            <div className="text-left">
+                                <span className="block text-xs font-normal text-emerald-200 uppercase tracking-wider">Continuer sur</span>
+                                <span className="text-lg">{user?.filmTitle}</span>
+                            </div>
+                            {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />}
+                        </button>
+
+                        <div className="relative flex py-2 items-center">
+                            <div className="flex-grow border-t border-cinema-700"></div>
+                            <span className="flex-shrink-0 mx-4 text-gray-500 text-xs uppercase">Ou</span>
+                            <div className="flex-grow border-t border-cinema-700"></div>
+                        </div>
+
+                        <button
+                            onClick={() => setView('form')}
+                            className="w-full bg-cinema-700 hover:bg-cinema-600 text-slate-300 font-medium py-3 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Nouveau Projet / Autre Film
+                        </button>
+                    </div>
+
+                    <button
+                        onClick={logout}
+                        className="w-full text-slate-500 hover:text-red-400 text-sm py-2 flex items-center justify-center gap-2 transition-colors mt-6"
+                    >
+                        <LogOut className="h-4 w-4" /> Se déconnecter
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-700">
             <div className="bg-cinema-800 border border-cinema-700 p-8 rounded-2xl shadow-2xl relative z-10">
                 <div className="text-center mb-8">
-                    <div className="w-16 h-16 bg-gradient-to-br from-eco-500 to-emerald-700 rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg transform rotate-3">
-                        <Film className="h-8 w-8 text-white" />
+                    <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg transform rotate-3">
+                        <Plus className="h-8 w-8 text-white" />
                     </div>
                     <h2 className="text-2xl font-bold text-white mb-2">
-                        Sur quel projet travaillez-vous ?
+                        Nouveau Projet
                     </h2>
                     <p className="text-slate-400 text-sm">
-                        Rejoignez ou créez l'espace de travail de votre tournage.
+                        Entrez les informations de votre nouvelle production.
                     </p>
                 </div>
 
@@ -105,18 +154,30 @@ export const ProjectSelection: React.FC<ProjectSelectionProps> = ({ onProjectSel
                         ) : (
                             <>
                                 <Plus className="h-5 w-5" />
-                                Accéder au Plateau
+                                Créer l'espace
                             </>
                         )}
                     </button>
 
-                    <button
-                        type="button"
-                        onClick={logout}
-                        className="w-full text-slate-500 hover:text-red-400 text-sm py-2 flex items-center justify-center gap-2 transition-colors mt-2"
-                    >
-                        <LogOut className="h-4 w-4" /> Se déconnecter
-                    </button>
+                    <div className="flex flex-col gap-2 mt-4">
+                        {hasSavedProject && (
+                            <button
+                                type="button"
+                                onClick={() => setView('choice')}
+                                className="w-full text-slate-400 hover:text-white text-sm py-2 transition-colors"
+                            >
+                                Annuler et retourner au choix
+                            </button>
+                        )}
+
+                        <button
+                            type="button"
+                            onClick={logout}
+                            className="w-full text-slate-500 hover:text-red-400 text-sm py-2 flex items-center justify-center gap-2 transition-colors"
+                        >
+                            <LogOut className="h-4 w-4" /> Se déconnecter
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>

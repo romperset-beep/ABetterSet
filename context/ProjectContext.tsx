@@ -377,21 +377,9 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             const userData = userSnap.data() as User;
             setUser(userData);
 
-            // If user has a project attached, load it
-            if (userData.productionName && userData.filmTitle) {
-              // We can call the helper directly if needed, but here we just update state 
-              // because loadProject should trigger via the project.id change
-              // But we need to SET the project.id
-              const pid = generateProjectId(userData.productionName, userData.filmTitle);
-              setProject(prev => ({
-                ...prev,
-                id: pid,
-                name: userData.filmTitle,
-                productionCompany: userData.productionName,
-                shootingStartDate: userData.startDate || prev.shootingStartDate,
-                shootingEndDate: userData.endDate || prev.shootingEndDate
-              }));
-            }
+            // If user has a project attached, we DON'T load it automatically anymore.
+            // We just let the UI handle the "Welcome Back" screen based on userData.
+            // The user must explicitly click "Continue" or "New Project"
           } else {
             console.log("Auth Logged in but no firestore profile found (Legacy?)");
             // If anonymous legacy user, we might want to keep them logged in?
