@@ -52,7 +52,7 @@ interface ProjectContextType {
   user: User | null;
   login: (email: string, pass: string) => Promise<void>;
   register: (email: string, pass: string, name: string, dept: Department | 'PRODUCTION') => Promise<void>; // Added
-  joinProject: (prod: string, film: string) => Promise<void>; // Added
+  joinProject: (prod: string, film: string, start?: string, end?: string) => Promise<void>; // Added
   logout: () => void;
 
   // Notifications
@@ -386,7 +386,9 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                 ...prev,
                 id: pid,
                 name: userData.filmTitle,
-                productionCompany: userData.productionName
+                productionCompany: userData.productionName,
+                shootingStartDate: userData.startDate || prev.shootingStartDate,
+                shootingEndDate: userData.endDate || prev.shootingEndDate
               }));
             }
           } else {
@@ -438,7 +440,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
-  const joinProject = async (prod: string, film: string) => {
+  const joinProject = async (prod: string, film: string, start?: string, end?: string) => {
     if (!auth.currentUser || !user) return;
 
     const projectId = generateProjectId(prod, film);
@@ -448,16 +450,26 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       ...prev,
       id: projectId,
       name: film,
-      productionCompany: prod
+      productionCompany: prod,
+      shootingStartDate: start || prev.shootingStartDate,
+      shootingEndDate: end || prev.shootingEndDate
     }));
 
     // 2. Update Persisted User Profile with new current project
-    const updatedUser = { ...user, productionName: prod, filmTitle: film };
+    const updatedUser: User = {
+      ...user,
+      productionName: prod,
+      filmTitle: film,
+      startDate: start,
+      endDate: end
+    };
     setUser(updatedUser); // Optimistic
 
     await updateDoc(doc(db, 'users', auth.currentUser.uid), {
       productionName: prod,
-      filmTitle: film
+      filmTitle: film,
+      startDate: start || null,
+      endDate: end || null
     });
 
     addNotification(`Bienvenue sur le plateau de "${film}" !`, 'INFO', user.department);

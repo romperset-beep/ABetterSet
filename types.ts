@@ -166,4 +166,6 @@ export interface User {
   department: Department | 'PRODUCTION';
   productionName: string;
   filmTitle: string;
+  startDate?: string;
+  endDate?: string;
 }

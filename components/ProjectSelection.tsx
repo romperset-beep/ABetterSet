@@ -12,7 +12,9 @@ export const ProjectSelection: React.FC<ProjectSelectionProps> = ({ onProjectSel
 
     const [formData, setFormData] = useState({
         productionName: user?.productionName || '',
-        filmTitle: user?.filmTitle || ''
+        filmTitle: user?.filmTitle || '',
+        startDate: user?.startDate || '',
+        endDate: user?.endDate || ''
     });
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -21,7 +23,7 @@ export const ProjectSelection: React.FC<ProjectSelectionProps> = ({ onProjectSel
 
         setIsLoading(true);
         try {
-            await joinProject(formData.productionName, formData.filmTitle);
+            await joinProject(formData.productionName, formData.filmTitle, formData.startDate, formData.endDate);
             onProjectSelected();
         } catch (err) {
             console.error(err);
@@ -68,6 +70,27 @@ export const ProjectSelection: React.FC<ProjectSelectionProps> = ({ onProjectSel
                             className="w-full bg-cinema-900 border border-cinema-700 rounded-lg pl-10 pr-4 py-3 text-white placeholder-slate-500 focus:ring-2 focus:ring-eco-500 focus:outline-none transition-all"
                             required
                         />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="relative group">
+                            <label className="text-xs text-slate-400 mb-1 block ml-1">Début Tournage</label>
+                            <input
+                                type="date"
+                                value={formData.startDate}
+                                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                                className="w-full bg-cinema-900 border border-cinema-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:ring-2 focus:ring-eco-500 focus:outline-none transition-all"
+                            />
+                        </div>
+                        <div className="relative group">
+                            <label className="text-xs text-slate-400 mb-1 block ml-1">Fin Tournage</label>
+                            <input
+                                type="date"
+                                value={formData.endDate}
+                                onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                                className="w-full bg-cinema-900 border border-cinema-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:ring-2 focus:ring-eco-500 focus:outline-none transition-all"
+                            />
+                        </div>
                     </div>
 
                     <button
