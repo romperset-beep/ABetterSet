@@ -13,6 +13,13 @@ export const ProjectSelection: React.FC<ProjectSelectionProps> = ({ onProjectSel
     const hasSavedProject = user?.productionName && user?.filmTitle;
     const [view, setView] = useState<'choice' | 'form'>(hasSavedProject ? 'choice' : 'form');
 
+    const [formData, setFormData] = useState({
+        productionName: user?.productionName || '',
+        filmTitle: user?.filmTitle || '',
+        startDate: user?.startDate || '',
+        endDate: user?.endDate || ''
+    });
+
     const handleResume = async () => {
         if (!user?.productionName || !user?.filmTitle) return;
         setIsLoading(true);

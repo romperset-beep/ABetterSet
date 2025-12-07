@@ -73,7 +73,7 @@ const AppContent: React.FC = () => {
         return <TeamDirectory />;
 
       default:
-        return <ProjectManager setActiveTab={setActiveTab} />;
+        return <ProjectManager activeTab={activeTab} setActiveTab={setActiveTab} />;
     }
   };
 
