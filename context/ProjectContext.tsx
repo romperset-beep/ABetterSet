@@ -15,7 +15,8 @@ import {
   SurplusAction
 } from '../types';
 import { TRANSLATIONS } from './translations';
-import { db } from '../services/firebase';
+import { db, auth } from '../services/firebase';
+import { signInAnonymously } from 'firebase/auth';
 import {
   collection,
   doc,
@@ -113,6 +114,17 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [error, setError] = useState<string | null>(null);
   const [debugStatus, setDebugStatus] = useState<string>("");
   const [lastLog, setLastLog] = useState<string>("En attente...");
+
+  // Auto-login for persisted users
+  useEffect(() => {
+    if (user) {
+      signInAnonymously(auth).catch(err => {
+        console.error("Auto-login failed:", err);
+        setError("Session expirée. Veuillez vous reconnecter.");
+        logout();
+      });
+    }
+  }, []);
 
   // Sync Project Metadata (Dates, Status, etc.)
   useEffect(() => {
@@ -368,20 +380,30 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   }, [user]);
 
-  const login = (userData: User) => {
-    setUser(userData);
-    localStorage.setItem('cineStockUser', JSON.stringify(userData));
+  const login = async (userData: User) => {
+    try {
+      console.log("[Auth] Starting anonymous login...");
+      await signInAnonymously(auth);
+      console.log("[Auth] Anonymous login successful");
 
-    // Force immediate update of project ID
-    const newProjectId = generateProjectId(userData.productionName, userData.filmTitle);
-    setProject(prev => ({
-      ...prev,
-      id: newProjectId,
-      name: userData.filmTitle,
-      productionCompany: userData.productionName
-    }));
+      setUser(userData);
+      localStorage.setItem('cineStockUser', JSON.stringify(userData));
 
-    addNotification(`Bienvenue ${userData.name} !`, 'INFO', userData.department);
+      // Force immediate update of project ID
+      const newProjectId = generateProjectId(userData.productionName, userData.filmTitle);
+      setProject(prev => ({
+        ...prev,
+        id: newProjectId,
+        name: userData.filmTitle,
+        productionCompany: userData.productionName
+      }));
+
+      addNotification(`Bienvenue ${userData.name} !`, 'INFO', userData.department);
+    } catch (error: any) {
+      console.error("[Auth] Login failed:", error);
+      setError("Erreur d'authentification : " + error.message);
+      alert("Erreur de connexion sécurisée. Vérifiez votre internet.");
+    }
   };
 
   const logout = () => {
