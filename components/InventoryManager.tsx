@@ -746,16 +746,22 @@ export const InventoryManager: React.FC = () => {
                                                 )}
 
                                                 {isSurplus && (
-                                                    <button
-                                                        onClick={() => {
-                                                            const target = item.items[0];
-                                                            if (target) setSurplusAction(target.id, SurplusAction.NONE);
-                                                        }}
-                                                        className="p-2 mr-4 rounded-lg border border-cinema-600 text-slate-500 hover:text-slate-300 hover:bg-cinema-700 transition-all"
-                                                        title="Annuler l'envoi"
-                                                    >
-                                                        <Undo2 className="h-4 w-4" />
-                                                    </button>
+                                                    // Condition for Undo:
+                                                    // 1. Production can always undo.
+                                                    // 2. Department can ONLY undo if status is RELEASED_TO_PROD (before validation).
+                                                    // 3. If item is MARKETPLACE, DONATION or SHORT_FILM, Dept CANNOT undo.
+                                                    (user?.department === 'PRODUCTION' || item.surplusAction === SurplusAction.RELEASED_TO_PROD) && (
+                                                        <button
+                                                            onClick={() => {
+                                                                const target = item.items[0];
+                                                                if (target) setSurplusAction(target.id, SurplusAction.NONE);
+                                                            }}
+                                                            className="p-2 mr-4 rounded-lg border border-cinema-600 text-slate-500 hover:text-slate-300 hover:bg-cinema-700 transition-all"
+                                                            title="Annuler l'envoi"
+                                                        >
+                                                            <Undo2 className="h-4 w-4" />
+                                                        </button>
+                                                    )
                                                 )}
 
                                                 {/* Quantity Controls */}
