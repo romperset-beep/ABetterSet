@@ -13,6 +13,7 @@ import { TeamDirectory } from './components/TeamDirectory';
 import { ProjectProvider, useProject } from './context/ProjectContext';
 import { LoginPage } from './components/LoginPage';
 import { ProjectSelection } from './components/ProjectSelection';
+import { AdminDashboard } from './components/AdminDashboard';
 import { FallbackErrorBoundary } from './components/FallbackErrorBoundary';
 import { DebugFooter } from './components/DebugFooter';
 import { Bell, LogOut, User as UserIcon, Menu } from 'lucide-react';
@@ -75,6 +76,8 @@ const AppContent: React.FC = () => {
         return <UserProfilePage />;
       case 'team':
         return <TeamDirectory />;
+      case 'admin':
+        return <AdminDashboard />;
 
       default:
         return <ProjectManager activeTab={activeTab} setActiveTab={setActiveTab} />;

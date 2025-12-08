@@ -10,7 +10,8 @@ import {
   Users,
   MessageSquare,
   Euro,
-  ArrowRightLeft
+  ArrowRightLeft,
+  ShieldCheck
 } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 
@@ -35,12 +36,18 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, onCl
     { id: 'social', label: t('sidebar.social'), icon: MessageSquare },
     { id: 'team', label: t('sidebar.team'), icon: Users },
     { id: 'profile', label: t('sidebar.profile'), icon: Settings },
+    { id: 'admin', label: 'Administration', icon: ShieldCheck }, // Hidden by default filter
   ];
 
   // Filter items based on department
   const filteredItems = menuItems.filter(item => {
     if (item.id === 'profile') return true;
     if (item.id === 'social') return true;
+
+    // Super Admin
+    if (item.id === 'admin') {
+      return user?.email === 'romperset@gmail.com';
+    }
 
     // Production sees everything
     if (currentDept === 'PRODUCTION' || currentDept === 'Régie') return true;
