@@ -39,7 +39,7 @@ export const TeamDirectory: React.FC = () => {
                         {userProfiles.length} fiches de renseignements enregistrées
                     </p>
                 </div>
-                
+
                 <div className="flex gap-4 w-full md:w-auto">
                     <div className="relative flex-1 md:w-64">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -71,7 +71,7 @@ export const TeamDirectory: React.FC = () => {
                             <span className="bg-cinema-700 px-2 py-1 rounded text-sm">{dept}</span>
                             <span className="text-sm font-normal text-slate-500">({profiles.length})</span>
                         </h3>
-                        
+
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                             {profiles.map(profile => (
                                 <div key={profile.email} className="bg-cinema-800 rounded-xl border border-cinema-700 p-4 hover:border-blue-500/50 transition-colors group">
@@ -100,10 +100,10 @@ export const TeamDirectory: React.FC = () => {
                                     </div>
 
                                     <div className="pt-4 border-t border-cinema-700 grid grid-cols-2 gap-2">
-                                        <DocumentButton label="RIB" hasDoc={!!profile.rib} />
-                                        <DocumentButton label="CNI" hasDoc={!!profile.idCard} />
-                                        <DocumentButton label="CMB" hasDoc={!!profile.cmbCard} />
-                                        <DocumentButton label="Permis" hasDoc={!!profile.drivingLicense} />
+                                        <DocumentButton label="RIB" hasDoc={!!profile.rib} url={profile.rib} />
+                                        <DocumentButton label="CNI" hasDoc={!!profile.idCard} url={profile.idCard} />
+                                        <DocumentButton label="CMB" hasDoc={!!profile.cmbCard} url={profile.cmbCard} />
+                                        <DocumentButton label="Permis" hasDoc={!!profile.drivingLicense} url={profile.drivingLicense} />
                                     </div>
                                 </div>
                             ))}
@@ -121,16 +121,25 @@ export const TeamDirectory: React.FC = () => {
     );
 };
 
-const DocumentButton = ({ label, hasDoc }: { label: string, hasDoc: boolean }) => (
-    <button
-        disabled={!hasDoc}
-        className={`flex items-center justify-center gap-2 py-1.5 rounded text-xs font-medium transition-colors ${
-            hasDoc 
-                ? 'bg-cinema-700 text-white hover:bg-blue-600' 
+const DocumentButton = ({ label, hasDoc, url }: { label: string, hasDoc: boolean, url?: string }) => {
+    const handleClick = () => {
+        if (url) {
+            window.open(url, '_blank');
+        }
+    };
+
+    return (
+        <button
+            onClick={handleClick}
+            disabled={!hasDoc}
+            className={`flex items-center justify-center gap-2 py-1.5 rounded text-xs font-medium transition-colors ${hasDoc
+                ? 'bg-cinema-700 text-white hover:bg-blue-600 cursor-pointer'
                 : 'bg-cinema-900/50 text-slate-600 cursor-not-allowed'
-        }`}
-    >
-        <FileText className="h-3 w-3" />
-        {label}
-    </button>
-);
+                }`}
+            title={hasDoc ? "Voir le document" : "Non disponible"}
+        >
+            <FileText className="h-3 w-3" />
+            {label}
+        </button>
+    );
+};
