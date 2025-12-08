@@ -73,7 +73,7 @@ export const LoginPage: React.FC = () => {
 
             {/* Flow Orchestration */}
             {showOnboarding ? (
-                <OnboardingCarousel onComplete={handleOnboardingComplete} />
+                <OnboardingCarousel onComplete={handleOnboardingComplete} language={language} />
             ) : user ? (
                 // User is logged in
                 showProjectSelection ? (
