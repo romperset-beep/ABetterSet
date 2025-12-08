@@ -59,7 +59,7 @@ const MOCK_GLOBAL_STOCK = [
 ];
 
 export const GlobalStock: React.FC = () => {
-    const { project, setProject } = useProject();
+    const { project, setProject, user } = useProject();
     const [mockItems, setMockItems] = React.useState(MOCK_GLOBAL_STOCK);
     const [editingItem, setEditingItem] = React.useState<any | null>(null);
     const [editForm, setEditForm] = React.useState({ price: 0, quantity: 0 });
@@ -199,9 +199,22 @@ export const GlobalStock: React.FC = () => {
                                             {(item.price * item.quantity).toLocaleString('fr-FR')} €
                                         </div>
                                     </div>
+                                    {/* Edit Button - Restricted to PRODUCTION */}
+                                    {project /* Accessing context to check user role would be better, but assuming user context is available */}
+                                    {/* Actually I need to check user role. GlobalStock uses useProject() which has user. */}
+
                                     <button
                                         onClick={() => handleEditClick(item)}
-                                        className="p-2 rounded-lg bg-cinema-700 text-slate-300 hover:bg-blue-600 hover:text-white transition-all opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0"
+                                        // Hide if not Production AND it's a real item (not mock)
+                                        // Actually global stock logic is:
+                                        // Real items come from project.items
+                                        // Mock items come from MOCK_GLOBAL_STOCK
+                                        // We should only allow editing if user is PRODUCTION.
+                                        className={`p-2 rounded-lg bg-cinema-700 text-slate-300 hover:bg-blue-600 hover:text-white transition-all transform ${project.productionCompany === item.production ? 'opacity-100' : 'opacity-0'} group-hover:opacity-100 ${/* Security Check would go here */ ''}`}
+                                        style={{
+                                            display: (project.role === 'PRODUCTION' ||
+                                                (user?.department === 'PRODUCTION')) ? 'block' : 'none'
+                                        }}
                                     >
                                         <Edit className="h-5 w-5" />
                                     </button>
