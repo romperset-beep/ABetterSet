@@ -323,12 +323,12 @@ export const SocialFeed: React.FC = () => {
                                 </div>
                             )}
 
-                            <div className="flex justify-between items-center pt-2 border-t border-cinema-700">
+                            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2 pt-2 border-t border-cinema-700">
                                 <button
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}
                                     disabled={isProcessing}
-                                    className="flex items-center gap-2 text-slate-400 hover:text-pink-400 transition-colors text-sm font-medium disabled:opacity-50"
+                                    className="flex items-center justify-center sm:justify-start gap-2 text-slate-400 hover:text-pink-400 transition-colors text-sm font-medium disabled:opacity-50 py-2 sm:py-0"
                                 >
                                     <ImageIcon className="h-5 w-5" />
                                     Ajouter une photo
@@ -341,9 +341,9 @@ export const SocialFeed: React.FC = () => {
                                     className="hidden"
                                 />
 
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                                     {targetAudience !== 'GLOBAL' && (
-                                        <span className="text-xs text-yellow-400 flex items-center gap-1 bg-yellow-400/10 px-2 py-1 rounded">
+                                        <span className="text-xs text-yellow-400 flex items-center justify-center gap-1 bg-yellow-400/10 px-2 py-1 rounded">
                                             <Lock className="h-3 w-3" />
                                             Message Privé
                                         </span>
@@ -351,7 +351,7 @@ export const SocialFeed: React.FC = () => {
                                     <button
                                         type="submit"
                                         disabled={(!newPostContent.trim() && !photo) || isProcessing}
-                                        className="bg-pink-600 hover:bg-pink-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-pink-600/20"
+                                        className="bg-pink-600 hover:bg-pink-500 text-white px-6 py-2 rounded-lg font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-pink-600/20"
                                     >
                                         <Send className="h-4 w-4" />
                                         Publier
@@ -371,7 +371,7 @@ export const SocialFeed: React.FC = () => {
                         <p>Aucun message pour le moment. Soyez le premier à publier !</p>
                     </div>
                 ) : (
-                    <div className="space-y-4">
+                    <div className="flex flex-col gap-4">
                         {visiblePosts.map(post => {
                             const myProfile = userProfiles.find(p => p.email === user?.email);
                             const isMe = post.authorId === myProfile?.id || (!post.authorId && post.authorName === user?.name);
@@ -381,41 +381,44 @@ export const SocialFeed: React.FC = () => {
                                     key={post.id}
                                     className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'}`}
                                 >
-                                    <div className={`max-w-[75%] rounded-2xl px-4 py-3 shadow-sm text-sm ${isMe
-                                            ? 'bg-pink-600 text-white rounded-br-none'
-                                            : 'bg-cinema-700 text-slate-200 rounded-bl-none'
-                                        }`}>
-                                        {/* Sender Name (Only if not me and in generic view) */}
-                                        {!isMe && (
-                                            <div className="text-[10px] text-pink-400 font-bold mb-1 flex items-center gap-2">
-                                                {post.authorName} - {post.authorDepartment}
+                                    <div className={`
+                                        relative max-w-[85%] sm:max-w-[70%] lg:max-w-[60%] 
+                                        rounded-2xl px-4 py-3 shadow-md text-sm transition-all
+                                        ${isMe
+                                            ? 'bg-gradient-to-br from-pink-600 to-purple-600 text-white rounded-br-sm mr-1'
+                                            : 'bg-cinema-700 text-slate-200 rounded-bl-sm ml-1 border border-cinema-600'}
+                                    `}>
+                                        {/* Sender Name (Only if not me and outside DMs if desired, but user wants chat look so name is useful in group) */}
+                                        {!isMe && (targetAudience === 'GLOBAL' || targetAudience === 'DEPARTMENT') && (
+                                            <div className="text-[10px] text-pink-400 font-bold mb-1 flex items-center gap-2 opacity-80">
+                                                {post.authorName} • {post.authorDepartment}
                                             </div>
                                         )}
 
                                         {/* Content */}
-                                        <div className="whitespace-pre-wrap leading-relaxed">
+                                        <div className="whitespace-pre-wrap leading-relaxed break-words">
                                             {post.content}
                                         </div>
 
                                         {/* Photo */}
                                         {post.photo && (
-                                            <div className="mt-2 text-right">
+                                            <div className={`mt-2 ${isMe ? 'text-right' : 'text-left'}`}>
                                                 <img
                                                     src={post.photo}
                                                     alt="Attachement"
-                                                    className="rounded-lg max-h-60 w-auto object-cover border border-white/10"
+                                                    className="rounded-lg max-h-60 w-auto object-cover border border-white/10 inline-block"
                                                 />
                                             </div>
                                         )}
 
                                         {/* Metadata Footer */}
-                                        <div className={`flex items-center gap-2 mt-1 text-[10px] ${isMe ? 'text-pink-200' : 'text-slate-400'} justify-end`}>
+                                        <div className={`flex items-center gap-2 mt-1 text-[10px] ${isMe ? 'text-pink-200/70' : 'text-slate-400'} justify-end`}>
                                             <span>
                                                 {new Date(post.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </span>
                                             {post.likes > 0 && (
                                                 <span className="flex items-center gap-0.5">
-                                                    <Heart className="h-3 w-3 fill-current" /> {post.likes}
+                                                    <Heart className="h-3 w-3 fill-current text-pink-500" /> {post.likes}
                                                 </span>
                                             )}
                                         </div>
