@@ -30,7 +30,8 @@ import {
   query,
   orderBy,
   arrayUnion,
-  where // Added
+  where,
+  deleteDoc // Added
 } from 'firebase/firestore';
 
 // Auth State Listener and Functions moved inside Provider
@@ -56,7 +57,8 @@ interface ProjectContextType {
   login: (email: string, pass: string) => Promise<void>;
   register: (email: string, pass: string, name: string, dept: Department | 'PRODUCTION') => Promise<void>; // Added
   joinProject: (prod: string, film: string, start?: string, end?: string, type?: string) => Promise<void>;
-  leaveProject: () => Promise<void>; // Added
+  leaveProject: () => Promise<void>;
+  deleteProject: (projectId: string) => Promise<void>; // Added
   logout: () => void;
 
   // Notifications
@@ -624,6 +626,61 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     });
   };
 
+  const deleteProject = async (projectId: string) => {
+    if (!auth.currentUser || !user) return;
+
+    // Safety check: Only romperset@gmail.com can delete
+    if (user.email !== 'romperset@gmail.com') {
+      throw new Error("Action non autorisée");
+    }
+
+    try {
+      console.log(`[deleteProject] Deleting project: ${projectId}`);
+
+      // 1. Delete Project Document
+      const projectRef = doc(db, 'projects', projectId);
+      await deleteDoc(projectRef);
+
+      // 2. Remove from Current User History (Admin)
+      const currentHistory = user.projectHistory || [];
+      const updatedHistory = currentHistory.filter(p => p.id !== projectId);
+
+      const userRef = doc(db, 'users', auth.currentUser.uid);
+      await updateDoc(userRef, {
+        projectHistory: updatedHistory,
+        // If current project is the deleted one, reset fields
+        ...(user.filmTitle === project.name && user.productionName === project.productionCompany ? {
+          productionName: '',
+          filmTitle: '',
+          startDate: null,
+          endDate: null,
+          projectType: null
+        } : {})
+      });
+
+      // Update local state
+      setUser(prev => prev ? ({ ...prev, projectHistory: updatedHistory }) : null);
+
+      // If we are currently ON this project, force switch to default
+      if (project.id === projectId) {
+        setProject(DEFAULT_PROJECT);
+        setUser(prev => prev ? ({
+          ...prev,
+          productionName: '',
+          filmTitle: '',
+          startDate: undefined,
+          endDate: undefined
+        }) : null);
+      }
+
+      addNotification("Projet supprimé définitivement", "SUCCESS", "PRODUCTION");
+
+    } catch (err: any) {
+      console.error("[deleteProject] Error:", err);
+      throw err;
+    }
+  };
+
   const logout = async () => {
     await signOut(auth);
     localStorage.removeItem('cineStockUser'); // Clean legacy
@@ -853,6 +910,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       updateProjectDetails,
       joinProject,
       leaveProject,
+      deleteProject, // Added
       addItem,
       updateItem,
       deleteItem,

@@ -2,32 +2,39 @@ import React, { useEffect, useState } from 'react';
 import { collection, getDocs, orderBy, query } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { User } from '../types';
-import { ShieldCheck, Search, Users, Building2, Calendar, Film } from 'lucide-react';
+import { useProject } from '../context/ProjectContext'; // Added
+import { ShieldCheck, Search, Users, Building2, Calendar, Film, Trash2 } from 'lucide-react'; // Added Trash2
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 export const AdminDashboard: React.FC = () => {
     const [users, setUsers] = useState<User[]>([]);
+    const [projectsList, setProjectsList] = useState<any[]>([]); // Using any for partial project data for now
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const { deleteProject } = useProject(); // Import delete function
 
     useEffect(() => {
-        const fetchUsers = async () => {
+        const fetchData = async () => {
             try {
-                // Fetch all users
-                // Note: In a real large-scale app, we'd paginate. For now, fetch all.
-                const q = query(collection(db, 'users'));
-                const snapshot = await getDocs(q);
-                const userList = snapshot.docs.map(doc => ({ ...doc.data() } as User));
-                setUsers(userList);
+                // Fetch Users
+                const usersQ = query(collection(db, 'users'));
+                const usersSnap = await getDocs(usersQ);
+                setUsers(usersSnap.docs.map(doc => ({ ...doc.data() } as User)));
+
+                // Fetch Projects
+                const projectsQ = query(collection(db, 'projects'));
+                const projectsSnap = await getDocs(projectsQ);
+                setProjectsList(projectsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
             } catch (error) {
-                console.error("Error fetching users:", error);
+                console.error("Error fetching data:", error);
             } finally {
                 setIsLoading(false);
             }
         };
 
-        fetchUsers();
+        fetchData();
     }, []);
 
     const filteredUsers = users.filter(u =>
@@ -78,6 +85,74 @@ export const AdminDashboard: React.FC = () => {
 
             {/* User List */}
             <div className="bg-cinema-800 border border-cinema-700 rounded-xl overflow-hidden shadow-2xl">
+                {/* ... existing User List is huge ... we'll keep it but duplicate structure for Projects above it */}
+            </div>
+
+            {/* Projects Management Section */}
+            <div className="bg-cinema-800 border border-cinema-700 rounded-xl overflow-hidden shadow-2xl">
+                <div className="p-6 border-b border-cinema-700 flex flex-col md:flex-row justify-between md:items-center gap-4 bg-cinema-800/50">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-purple-500/20 rounded-lg">
+                            <Film className="h-6 w-6 text-purple-500" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold text-white">Gestion des Projets</h2>
+                            <p className="text-sm text-slate-400">Administration et Suppression</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="bg-cinema-900/50 text-slate-400 text-xs uppercase tracking-wider border-b border-cinema-700">
+                                <th className="px-6 py-4 font-semibold">Titre du Film</th>
+                                <th className="px-6 py-4 font-semibold">Production</th>
+                                <th className="px-6 py-4 font-semibold">ID</th>
+                                <th className="px-6 py-4 font-semibold text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-cinema-700 text-sm">
+                            {isLoading ? (
+                                <tr><td colSpan={4} className="px-6 py-8 text-center text-slate-500">Chargement...</td></tr>
+                            ) : projectsList.length === 0 ? (
+                                <tr><td colSpan={4} className="px-6 py-8 text-center text-slate-500">Aucun projet trouvé.</td></tr>
+                            ) : (
+                                projectsList.map((p) => (
+                                    <tr key={p.id} className="hover:bg-cinema-700/30 transition-colors group">
+                                        <td className="px-6 py-4 text-white font-medium">{p.name || 'Sans titre'}</td>
+                                        <td className="px-6 py-4 text-slate-300">{p.productionCompany || 'N/A'}</td>
+                                        <td className="px-6 py-4 text-xs text-slate-500 font-mono">{p.id}</td>
+                                        <td className="px-6 py-4 text-right">
+                                            <button
+                                                onClick={async () => {
+                                                    if (window.confirm(`ATTENTION: Voulez-vous vraiment supprimer le projet "${p.name}" ?\n\nCette action est irréversible et retirera le projet de votre historique.`)) {
+                                                        try {
+                                                            await deleteProject(p.id);
+                                                            // Refresh list localized
+                                                            setProjectsList(prev => prev.filter(proj => proj.id !== p.id));
+                                                        } catch (e: any) {
+                                                            alert("Erreur: " + e.message);
+                                                        }
+                                                    }
+                                                }}
+                                                className="text-red-500 hover:text-red-400 p-2 hover:bg-red-500/10 rounded-lg transition-colors"
+                                                title="Supprimer définitivement"
+                                            >
+                                                <Trash2 className="h-5 w-5" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* Users List (Renamed Header slightly for clarity if needed, or kept as is) */}
+            <div className="bg-cinema-800 border border-cinema-700 rounded-xl overflow-hidden shadow-2xl">
+
                 <div className="p-6 border-b border-cinema-700 flex flex-col md:flex-row justify-between md:items-center gap-4 bg-cinema-800/50">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-red-500/20 rounded-lg">
