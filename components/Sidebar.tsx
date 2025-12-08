@@ -46,7 +46,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, onCl
 
     // Super Admin
     if (item.id === 'admin') {
-      return user?.email === 'romperset@gmail.com';
+      return user?.email === 'romperset@gmail.com' || user?.name === 'romperset';
     }
 
     // Production sees everything
