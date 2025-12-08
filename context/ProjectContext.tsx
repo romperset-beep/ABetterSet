@@ -387,9 +387,19 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
               setCurrentDept('PRODUCTION');
             }
           } else {
-            console.log("Auth Logged in but no firestore profile found (Legacy?)");
-            // If anonymous legacy user, we might want to keep them logged in?
-            // For now, let's treat them as new users or logout
+            console.log("Auth Logged in but no firestore profile found. Auto-repairing...");
+            // Auto-Repair: Create default profile
+            const recoveredUser: User = {
+              name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Utilisateur',
+              email: firebaseUser.email || '',
+              department: 'PRODUCTION', // Default safe fallback
+              productionName: 'Demo Prod',
+              filmTitle: 'Demo Film'
+            };
+
+            await setDoc(userRef, recoveredUser);
+            setUser(recoveredUser);
+            addNotification("Profil récupéré automatiquement", "INFO", "PRODUCTION");
           }
         } catch (e) {
           console.error("Error fetching user profile", e);
