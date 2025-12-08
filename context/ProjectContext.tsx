@@ -28,7 +28,8 @@ import {
   getDoc,
   query,
   orderBy,
-  arrayUnion
+  arrayUnion,
+  where // Added
 } from 'firebase/firestore';
 
 // Auth State Listener and Functions moved inside Provider
@@ -728,7 +729,48 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
+  // 4. Sync User Profiles (Team Members)
+  useEffect(() => {
+    if (!project.name || project.id === 'default-project') return;
+
+    // We query users who are currently working on this film
+    const usersRef = collection(db, 'users');
+    // Note: This requires an index on 'filmTitle'. If it fails, we might need to create it.
+    // For MVP/Small scale, we can fetch all or just filter client side if list is small, 
+    // but best practice is query. Let's try query.
+    const q = query(usersRef, where('filmTitle', '==', project.name));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const profiles: UserProfile[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data() as User;
+        // Map User to UserProfile structure (simplifying for now)
+        profiles.push({
+          id: doc.id,
+          email: data.email,
+          firstName: data.name.split(' ')[0] || '',
+          lastName: data.name.split(' ').slice(1).join(' ') || '',
+          department: data.department,
+          role: 'Membre', // Default
+          // ... filler for other required UserProfile fields ...
+          address: '', postalCode: '', city: '', phone: '', familyStatus: '',
+          ssn: '', birthPlace: '', birthDate: '', birthDepartment: '', birthCountry: '', nationality: '', socialSecurityCenterAddress: '',
+          emergencyContactName: '', emergencyContactPhone: '',
+          isRetired: false, congeSpectacleNumber: '', lastMedicalVisit: ''
+        });
+      });
+      setUserProfiles(profiles);
+      console.log(`[TeamSync] Found ${profiles.length} team members`);
+    }, (err) => {
+      console.error("Team Sync Error:", err);
+      // Fallback: If index error, might just fail silently or log.
+    });
+
+    return () => unsubscribe();
+  }, [project.name]);
+
   const updateUserProfile = (profile: UserProfile) => {
+    // Legacy local update, keeping it as is but it's less useful now with sync
     setUserProfiles(prev => {
       const existingIndex = prev.findIndex(p => p.email === profile.email);
       if (existingIndex >= 0) {
@@ -738,11 +780,6 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       }
       return [...prev, profile];
     });
-    addNotification(
-      `Mise à jour du profil de ${profile.firstName} ${profile.lastName}`,
-      'INFO',
-      'PRODUCTION'
-    );
   };
 
   const unreadCount = project.items.filter(i =>

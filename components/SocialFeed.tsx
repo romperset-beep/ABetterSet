@@ -13,6 +13,8 @@ export const SocialFeed: React.FC = () => {
     const [targetAudience, setTargetAudience] = useState<'GLOBAL' | 'DEPARTMENT' | 'USER'>('GLOBAL');
     const [targetDept, setTargetDept] = useState<Department | 'PRODUCTION'>('PRODUCTION');
     const [targetUserId, setTargetUserId] = useState<string>('');
+    const [searchTerm, setSearchTerm] = useState(''); // Added for search input
+    const [showSuggestions, setShowSuggestions] = useState(false);
 
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -83,6 +85,18 @@ export const SocialFeed: React.FC = () => {
         }
     };
 
+    const handleUserSelect = (user: { id: string, name: string }) => {
+        setTargetUserId(user.id);
+        setSearchTerm(user.name);
+        setShowSuggestions(false);
+    };
+
+    // Filter suggestions locally
+    const filteredUsers = userProfiles.filter(p => {
+        const fullName = `${p.firstName} ${p.lastName}`.toLowerCase();
+        return fullName.includes(searchTerm.toLowerCase());
+    });
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if ((!newPostContent.trim() && !photo) || isProcessing) return;
@@ -103,7 +117,10 @@ export const SocialFeed: React.FC = () => {
         addSocialPost(newPost);
         setNewPostContent('');
         setPhoto(null);
-        setTargetAudience('GLOBAL'); // Reset to default
+        // Reset Targeting
+        setTargetAudience('GLOBAL');
+        setTargetUserId('');
+        setSearchTerm('');
     };
 
     // Filter Posts Logic
@@ -178,20 +195,56 @@ export const SocialFeed: React.FC = () => {
                             </select>
                         )}
 
-                        {/* User Selector */}
+                        {/* User Selector (Searchable) */}
                         {targetAudience === 'USER' && (
-                            <select
-                                value={targetUserId}
-                                onChange={(e) => setTargetUserId(e.target.value)}
-                                className="bg-cinema-900 text-white border border-cinema-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-pink-500 outline-none animate-in fade-in slide-in-from-left-2"
-                            >
-                                <option value="">Choisir un destinataire...</option>
-                                {userProfiles.map(p => (
-                                    <option key={p.id} value={p.id}>
-                                        {p.firstName} {p.lastName} {p.department !== 'PRODUCTION' ? `(${p.department})` : ''}
-                                    </option>
-                                ))}
-                            </select>
+                            <div className="relative animate-in fade-in slide-in-from-left-2 w-64 z-20">
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        placeholder="Rechercher une personne..."
+                                        className="w-full bg-cinema-900 text-white border border-cinema-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-pink-500 outline-none pl-8"
+                                        value={searchTerm}
+                                        onChange={(e) => {
+                                            setSearchTerm(e.target.value);
+                                            setTargetUserId(''); // Clear ID when typing
+                                            setShowSuggestions(true);
+                                        }}
+                                        onFocus={() => setShowSuggestions(true)}
+                                    />
+                                    <User className="absolute left-2 top-2.5 h-4 w-4 text-slate-500" />
+                                </div>
+
+                                {/* Suggestions Dropdown */}
+                                {showSuggestions && searchTerm && (
+                                    <div className="absolute top-full left-0 w-full mt-1 bg-cinema-800 border border-cinema-700 rounded-lg shadow-xl max-h-60 overflow-y-auto z-50">
+                                        {filteredUsers.length > 0 ? (
+                                            filteredUsers.map(p => (
+                                                <button
+                                                    key={p.id}
+                                                    type="button"
+                                                    onClick={() => handleUserSelect({
+                                                        id: p.id,
+                                                        name: `${p.firstName} ${p.lastName}`
+                                                    })}
+                                                    className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-cinema-700 hover:text-white transition-colors flex items-center gap-2 border-b border-cinema-700/50 last:border-0"
+                                                >
+                                                    <div className="bg-cinema-900 h-6 w-6 rounded-full flex items-center justify-center text-xs">
+                                                        {p.firstName.charAt(0)}
+                                                    </div>
+                                                    <span>{p.firstName} {p.lastName}</span>
+                                                    {p.department !== 'PRODUCTION' && (
+                                                        <span className="text-xs text-slate-500 ml-auto">{p.department}</span>
+                                                    )}
+                                                </button>
+                                            ))
+                                        ) : (
+                                            <div className="px-3 py-2 text-sm text-slate-500 text-center">
+                                                Aucun résultat
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         )}
                     </div>
 
