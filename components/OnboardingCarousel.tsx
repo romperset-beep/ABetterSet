@@ -60,7 +60,7 @@ export const OnboardingCarousel: React.FC<OnboardingCarouselProps> = ({ onComple
                 <div className={`mb-6 p-4 rounded-full bg-cinema-900 border border-cinema-700 shadow-xl transform transition-transform duration-500 group-hover:scale-110 flex items-center justify-center`}>
                     <LottieAnimation
                         url={steps[currentStep].animationUrl}
-                        className="h-24 w-24"
+                        className="h-24 w-24 rounded-full overflow-hidden"
                     />
                 </div>
 
