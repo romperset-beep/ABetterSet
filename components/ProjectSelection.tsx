@@ -124,6 +124,13 @@ export const ProjectSelection: React.FC<ProjectSelectionProps> = ({ onProjectSel
                                 {user?.projectHistory
                                     ?.filter(p => hasSavedProject ? (p.filmTitle !== user.filmTitle) : true) // Exclude current if relevant
                                     .sort((a, b) => new Date(b.lastAccess).getTime() - new Date(a.lastAccess).getTime())
+                                    // Deduplicate by ID to show unique projects
+                                    .filter((project, index, self) =>
+                                        index === self.findIndex((p) => (
+                                            p.id === project.id ||
+                                            (p.productionName === project.productionName && p.filmTitle === project.filmTitle)
+                                        ))
+                                    )
                                     .map(hist => (
                                         <button
                                             key={hist.id}
