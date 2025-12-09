@@ -11,7 +11,7 @@ interface ProjectManagerProps {
 export const ProjectManager: React.FC<ProjectManagerProps> = ({
     setActiveTab,
 }) => {
-    const { project, setProject, updateProjectDetails, currentDept, setCurrentDept, setCircularView, buyBackItems, socialPosts, userProfiles, user, t, error, testConnection, debugStatus, lastLog } = useProject();
+    const { project, setProject, updateProjectDetails, currentDept, setCurrentDept, setCircularView, buyBackItems, socialPosts, unreadSocialCount, userProfiles, user, t, error, testConnection, debugStatus, lastLog } = useProject();
 
     // Filter items based on current view (Department vs Production)
     const filteredItems = currentDept === 'PRODUCTION'
@@ -83,9 +83,9 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({
                         <MessageSquare className="h-6 w-6 text-pink-500 group-hover:scale-110 transition-transform" />
                     </div>
                     <p className="text-4xl font-bold mt-2 text-pink-500">
-                        {socialPosts?.length || 0}
+                        {unreadSocialCount}
                     </p>
-                    <p className="text-xs text-slate-400 mt-1">Chat & Photos d'équipe</p>
+                    <p className="text-xs text-slate-400 mt-1">Nouveaux messages</p>
                 </button>
                 {currentDept === 'PRODUCTION' && (
                     <button
