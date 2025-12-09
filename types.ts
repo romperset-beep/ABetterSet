@@ -88,6 +88,7 @@ export interface ExpenseReport {
   date: string; // ISO Date
   amountTTC: number;
   amountTVA: number;
+  amountHT?: number;
   merchantName?: string;
   items: string[]; // List of item names or IDs
   status: ExpenseStatus;

@@ -3,6 +3,8 @@ import { X, Upload, Camera, Loader2, CheckCircle2, AlertCircle, FileText } from 
 import { useProject } from '../context/ProjectContext';
 import { analyzeReceipt } from '../services/geminiService';
 import { ExpenseReport, ExpenseStatus } from '../types';
+import { storage } from '../services/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface ExpenseReportModalProps {
     isOpen: boolean;
@@ -19,11 +21,13 @@ export const ExpenseReportModal: React.FC<ExpenseReportModalProps> = ({ isOpen, 
     const [file, setFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
 
     // Form Data
     const [formData, setFormData] = useState<Partial<ExpenseReport>>({
         amountTTC: 0,
         amountTVA: 0,
+        amountHT: 0,
         merchantName: '',
         date: new Date().toISOString().split('T')[0],
         items: prefillItemNames || (prefillItemName ? [prefillItemName] : [])
@@ -45,6 +49,18 @@ export const ExpenseReportModal: React.FC<ExpenseReportModalProps> = ({ isOpen, 
             });
         }
     }, [isOpen, prefillItemName]);
+
+    // Auto-calculate HT when TTC or TVA changes
+    React.useEffect(() => {
+        const ttc = Number(formData.amountTTC) || 0;
+        const tva = Number(formData.amountTVA) || 0;
+        const ht = Math.max(0, Number((ttc - tva).toFixed(2)));
+
+        // Only update if different to avoid infinite loops or interfering with manual typing of other fields
+        if (formData.amountHT !== ht) {
+            setFormData(prev => ({ ...prev, amountHT: ht }));
+        }
+    }, [formData.amountTTC, formData.amountTVA]);
 
     if (!isOpen) return null;
 
@@ -71,42 +87,71 @@ export const ExpenseReportModal: React.FC<ExpenseReportModalProps> = ({ isOpen, 
                 }));
                 setStep('REVIEW');
             } else {
-                throw new Error("Impossible d'analyser le ticket.");
+                // Use the raw response or a specific error message if available
+                throw new Error(result.rawResponse || "Impossible d'analyser le ticket.");
             }
         } catch (err) {
             console.error(err);
-            setError("Erreur lors de l'analyse. Veuillez remplir les informations manuellement.");
+            const errorMessage = err instanceof Error ? err.message : "Erreur inconnue";
+
+            if (errorMessage.includes('429') || errorMessage.includes('Resource exhausted') || errorMessage.includes('quota')) {
+                setError("Quota IA dépassé. Veuillez réessayer plus tard ou utiliser une autre clé API.");
+            } else {
+                setError(`Erreur analyse: ${errorMessage}`);
+            }
             setStep('REVIEW');
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user) return;
 
-        const newReport: ExpenseReport = {
-            id: Math.random().toString(36).substr(2, 9),
-            date: formData.date || new Date().toISOString(),
-            amountTTC: Number(formData.amountTTC),
-            amountTVA: Number(formData.amountTVA),
-            merchantName: formData.merchantName,
-            items: formData.items || [],
-            status: ExpenseStatus.PENDING,
-            receiptUrl: previewUrl || undefined,
-            submittedBy: user.name,
-            department: user.department,
-            productionName: user.productionName,
-            filmTitle: user.filmTitle
-        };
+        setIsUploading(true);
+        try {
+            let finalReceiptUrl = previewUrl;
 
-        addExpenseReport(newReport);
-        setStep('SUCCESS');
-        setTimeout(() => {
-            onClose();
-            setStep('UPLOAD');
-            setFile(null);
-            setPreviewUrl(null);
-        }, 2000);
+            // Upload file to Firebase Storage if it's a new file (not just a preview URL)
+            if (file) {
+                const fileExt = file.name.split('.').pop();
+                const fileName = `expense_${Date.now()}.${fileExt}`;
+                const storagePath = `production/${user.productionName}/${user.name}/expenses/${fileName}`;
+                const storageRef = ref(storage, storagePath);
+
+                await uploadBytes(storageRef, file);
+                finalReceiptUrl = await getDownloadURL(storageRef);
+            }
+
+            const newReport: ExpenseReport = {
+                id: Math.random().toString(36).substr(2, 9),
+                date: formData.date || new Date().toISOString(),
+                amountTTC: Number(formData.amountTTC),
+                amountTVA: Number(formData.amountTVA),
+                amountHT: Number(formData.amountHT),
+                merchantName: formData.merchantName,
+                items: formData.items || [],
+                status: ExpenseStatus.PENDING,
+                receiptUrl: finalReceiptUrl || undefined,
+                submittedBy: user.name,
+                department: user.department,
+                productionName: user.productionName,
+                filmTitle: user.filmTitle
+            };
+
+            addExpenseReport(newReport);
+            setStep('SUCCESS');
+            setTimeout(() => {
+                onClose();
+                setStep('UPLOAD');
+                setFile(null);
+                setPreviewUrl(null);
+                setIsUploading(false);
+            }, 2000);
+        } catch (error) {
+            console.error("Error uploading expense receipt:", error);
+            setError("Erreur lors de l'envoi du justificatif.");
+            setIsUploading(false);
+        }
     };
 
     return (
@@ -209,7 +254,17 @@ export const ExpenseReportModal: React.FC<ExpenseReportModalProps> = ({ isOpen, 
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-xs text-slate-400 mb-1">Montant HT (€)</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        value={formData.amountHT}
+                                        onChange={e => setFormData({ ...formData, amountHT: parseFloat(e.target.value) })}
+                                        className="w-full bg-cinema-900 border border-cinema-700 rounded-lg px-3 py-2 text-white outline-none focus:border-eco-500"
+                                    />
+                                </div>
                                 <div>
                                     <label className="block text-xs text-slate-400 mb-1">Montant TTC (€)</label>
                                     <input
@@ -262,7 +317,13 @@ export const ExpenseReportModal: React.FC<ExpenseReportModalProps> = ({ isOpen, 
                                     type="submit"
                                     className="flex-1 bg-eco-600 hover:bg-eco-500 text-white py-3 rounded-xl font-bold transition-colors"
                                 >
-                                    Valider
+                                    {isUploading ? (
+                                        <span className="flex items-center justify-center gap-2">
+                                            <Loader2 className="h-4 w-4 animate-spin" /> Envoi...
+                                        </span>
+                                    ) : (
+                                        "Valider"
+                                    )}
                                 </button>
                             </div>
                         </form>

@@ -820,17 +820,68 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
-  const addExpenseReport = (report: ExpenseReport) => {
-    setExpenseReports(prev => [report, ...prev]);
-    addNotification(
-      `Nouvelle note de frais de ${report.submittedBy} (${report.amountTTC}€)`,
-      'INFO',
-      'PRODUCTION'
-    );
+  // 5. Sync Expense Reports
+  useEffect(() => {
+    const projectId = project.id;
+    if (!projectId || projectId === 'default-project') return;
+
+    const expensesRef = collection(db, 'projects', projectId, 'expenses');
+    const q = query(expensesRef, orderBy('date', 'desc'));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const reports: ExpenseReport[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        reports.push({
+          id: doc.id,
+          ...data
+        } as ExpenseReport);
+      });
+      setExpenseReports(reports);
+    }, (err) => {
+      console.error("[ExpenseSync] Sync Error:", err);
+    });
+
+    return () => unsubscribe();
+  }, [project.id]);
+
+  const addExpenseReport = async (report: ExpenseReport) => {
+    try {
+      const projectId = project.id;
+      // Use setDoc with the ID we generated in the modal, or use addDoc and let firestore generate it?
+      // The modal generates an ID. Let's stick to it or overwrite it.
+      // Better: Use `setDoc` with `report.id` if we want to keep that ID, OR `addDoc` and update the ID.
+      // Since modal generates an ID, let's use it as document ID for consistency.
+      const reportRef = doc(db, 'projects', projectId, 'expenses', report.id);
+      const { id, ...reportData } = report;
+
+      // Sanitize undefined
+      const sanitizedData = Object.fromEntries(
+        Object.entries(reportData).map(([k, v]) => [k, v === undefined ? null : v])
+      );
+
+      await setDoc(reportRef, sanitizedData);
+
+      addNotification(
+        `Nouvelle note de frais de ${report.submittedBy} (${report.amountTTC.toFixed(2)}€)`,
+        'INFO',
+        'PRODUCTION'
+      );
+    } catch (err: any) {
+      console.error("Error adding expense report:", err);
+      setError(`Erreur sauvegarde note de frais: ${err.message}`);
+    }
   };
 
-  const updateExpenseReportStatus = (id: string, status: ExpenseStatus) => {
-    setExpenseReports(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+  const updateExpenseReportStatus = async (id: string, status: ExpenseStatus) => {
+    try {
+      const projectId = project.id;
+      const reportRef = doc(db, 'projects', projectId, 'expenses', id);
+      await updateDoc(reportRef, { status });
+    } catch (err: any) {
+      console.error("Error updating expense status:", err);
+      setError(`Erreur mise à jour status: ${err.message}`);
+    }
   };
 
   const userNotifications = notifications.filter(n => {
