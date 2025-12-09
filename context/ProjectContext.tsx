@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+
 import {
   Project,
   User,
@@ -224,17 +225,17 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
   }).length;
   const unreadMarketplaceCount = buyBackItems.filter(i => new Date(i.date).getTime() > lastReadMarketplace).length;
 
-  const markSocialAsRead = () => {
+  const markSocialAsRead = useCallback(() => {
     const now = Date.now();
     setLastReadSocial(now);
     localStorage.setItem('lastReadSocial', String(now));
-  };
+  }, []);
 
-  const markMarketplaceAsRead = () => {
+  const markMarketplaceAsRead = useCallback(() => {
     const now = Date.now();
     setLastReadMarketplace(now);
     localStorage.setItem('lastReadMarketplace', String(now));
-  };
+  }, []);
 
   const testConnection = async () => {
     setDebugStatus("1. Test REST API en cours...");

@@ -1,10 +1,15 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useProject } from '../context/ProjectContext';
 import { MessageSquare, Image as ImageIcon, Send, Heart, User, Clock, Trash2, Users, Lock, ChevronDown } from 'lucide-react'; // Added icons
 import { SocialPost, Department } from '../types'; // Added Department
 
 export const SocialFeed: React.FC = () => {
-    const { socialPosts, addSocialPost, deleteSocialPost, user, userProfiles } = useProject(); // Added deleteSocialPost
+    const { socialPosts, addSocialPost, deleteSocialPost, user, userProfiles, markSocialAsRead } = useProject(); // Added deleteSocialPost
+
+    // Mark as read when entering the feed
+    useEffect(() => {
+        markSocialAsRead();
+    }, [markSocialAsRead]);
     const [newPostContent, setNewPostContent] = useState('');
     const [photo, setPhoto] = useState<string | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
