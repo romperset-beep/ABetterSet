@@ -197,3 +197,11 @@ export interface CallSheet {
   uploadedBy: string; // User Name
   department: Department | 'PRODUCTION';
 }
+
+export interface CatalogItem {
+  id: string; // Generated Firestore ID
+  name: string; // Item name for autocomplete
+  department: Department | 'PRODUCTION';
+  usageCount: number; // For sorting/popularity
+  lastUsed: string; // ISO Date
+}

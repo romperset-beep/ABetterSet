@@ -15,7 +15,8 @@ import {
   ConsumableItem,
   ItemStatus,
   SurplusAction,
-  CallSheet
+  CallSheet,
+  CatalogItem
 } from '../types';
 import { TRANSLATIONS } from './translations';
 import { db, auth } from '../services/firebase';
@@ -101,6 +102,10 @@ interface ProjectContextType {
   testConnection: () => Promise<void>;
   debugStatus: string;
   lastLog: string;
+
+  // Global Catalog
+  catalogItems: CatalogItem[];
+  addToCatalog: (name: string, dept: string) => Promise<void>;
 }
 
 const DEFAULT_PROJECT: Project = {
@@ -138,6 +143,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [buyBackItems, setBuyBackItems] = useState<BuyBackItem[]>([]);
   const [socialPosts, setSocialPosts] = useState<SocialPost[]>([]);
   const [callSheets, setCallSheets] = useState<CallSheet[]>([]); // New State
+  const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]); // Global Catalog
   const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [debugStatus, setDebugStatus] = useState<string>("");
@@ -437,6 +443,54 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     // await deleteDoc(doc(db, 'projects', 'demo-project', 'items', itemId));
   };
 
+
+
+  // FSC: Sync Catalog
+  useEffect(() => {
+    // Global collection 'catalog'
+    const catalogRef = collection(db, 'catalog');
+    const q = query(catalogRef, orderBy('usageCount', 'desc'));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const items: CatalogItem[] = [];
+      snapshot.forEach(doc => {
+        items.push({ id: doc.id, ...doc.data() } as CatalogItem);
+      });
+      setCatalogItems(items);
+    }, (err) => {
+      console.error("[Catalog] Sync Error:", err);
+      // Access denied is expected if security rules are tight, but for now we assume open read
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const addToCatalog = async (name: string, dept: string) => {
+    if (!name) return;
+
+    // Check if exists (case insensitive check locally first to save read)
+    const normalizedName = name.trim();
+    const existing = catalogItems.find(i => i.name.toLowerCase() === normalizedName.toLowerCase() && i.department === dept);
+
+    if (existing) {
+      // Update usage count
+      const itemRef = doc(db, 'catalog', existing.id);
+      await updateDoc(itemRef, {
+        usageCount: (existing.usageCount || 0) + 1,
+        lastUsed: new Date().toISOString()
+      });
+    } else {
+      // Add new
+      const catalogRef = collection(db, 'catalog');
+      await addDoc(catalogRef, {
+        name: normalizedName,
+        department: dept,
+        usageCount: 1,
+        lastUsed: new Date().toISOString()
+      } as Omit<CatalogItem, 'id'>);
+      console.log(`[Catalog] Added new item: ${normalizedName}`);
+    }
+  };
 
   // --- Legacy Local State Actions (To be migrated) ---
 
@@ -1113,6 +1167,11 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       deleteSocialPost, // Added
       callSheets,
       addCallSheet,
+
+      // Catalog
+      catalogItems,
+      addToCatalog,
+
       userProfiles,
       updateUserProfile,
       language,

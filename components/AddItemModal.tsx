@@ -93,7 +93,7 @@ interface AddItemModalProps {
 }
 
 export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose }) => {
-    const { setProject, currentDept, project, addNotification, user, addItem } = useProject();
+    const { setProject, currentDept, project, addNotification, user, addItem, catalogItems, addToCatalog } = useProject();
 
     const [newItemName, setNewItemName] = useState('');
     const [newItemQty, setNewItemQty] = useState(1);
@@ -112,10 +112,13 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose }) =
     const allCatalogItems = useMemo(() => {
         const allItems = new Set<string>();
         Object.values(POPULAR_ITEMS).forEach(items => items.forEach(i => allItems.add(i)));
-        // Also add items from history
+        // Add items from history
         project.items.forEach(i => allItems.add(i.name));
+        // Add items from Global Catalog
+        catalogItems.forEach(i => allItems.add(i.name));
+
         return Array.from(allItems).sort();
-    }, [project.items]);
+    }, [project.items, catalogItems]);
 
     // Filter suggestions when typing
     useEffect(() => {
@@ -214,6 +217,11 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose }) =
         // Use Firestore Action instead of local state
         if (addItem) {
             await addItem(newItem);
+
+            // Add to Global Catalog for future suggestions
+            if (addToCatalog) {
+                addToCatalog(newItemName, finalDepartment);
+            }
         } else {
             console.error("addItem function is missing from context!");
             alert("Erreur interne : Impossible d'ajouter l'article (Fonction manquante).");
@@ -247,8 +255,11 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose }) =
     const historyItems = project.items
         .filter(item => item.department === selectedDept)
         .map(item => item.name);
+    const globalCatalogItems = catalogItems
+        .filter(item => item.department === selectedDept)
+        .map(item => item.name);
 
-    const catalogItems = Array.from(new Set([...baseCatalog, ...historyItems])).sort((a, b) => a.localeCompare(b));
+    const catalogItemsList = Array.from(new Set([...baseCatalog, ...historyItems, ...globalCatalogItems])).sort((a, b) => a.localeCompare(b));
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
@@ -454,14 +465,14 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose }) =
                             </button>
                         </div>
                         <div className="p-4 overflow-y-auto flex-1 custom-scrollbar">
-                            {catalogItems.length === 0 ? (
+                            {catalogItemsList.length === 0 ? (
                                 <div className="text-center py-12 text-slate-500">
                                     <Search className="h-10 w-10 mx-auto mb-4 opacity-20" />
                                     <p>Aucun article.</p>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-2 gap-3">
-                                    {catalogItems.map((item, idx) => (
+                                    {catalogItemsList.map((item, idx) => (
                                         <button
                                             key={idx}
                                             onClick={() => selectItemFromCatalog(item)}
