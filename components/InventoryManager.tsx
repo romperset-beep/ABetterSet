@@ -579,23 +579,14 @@ export const InventoryManager: React.FC = () => {
                                     {isProductionOrRegie ? (
                                         // View for Production/Regie
                                         item.isBought ? (
-                                            item.department === 'PRODUCTION' ? (
-                                                <button
-                                                    onClick={() => markAsPurchased(item.id)}
-                                                    className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all"
-                                                >
-                                                    <PackageCheck className="h-4 w-4" />
-                                                    Valider Réception
-                                                </button>
-                                            ) : (
-                                                <button
-                                                    disabled
-                                                    className="flex items-center gap-2 bg-cinema-700 text-slate-400 px-4 py-2 rounded-lg text-sm font-medium opacity-70 cursor-not-allowed"
-                                                >
-                                                    <Clock className="h-4 w-4" />
-                                                    En attente réception
-                                                </button>
-                                            )
+                                            // ALLOW Production/Regie to validate reception for ALL items, not just their own department.
+                                            <button
+                                                onClick={() => markAsPurchased(item.id)}
+                                                className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                                            >
+                                                <PackageCheck className="h-4 w-4" />
+                                                Valider Réception
+                                            </button>
                                         ) : (
                                             <button
                                                 onClick={() => markAsBought(item.id)}
