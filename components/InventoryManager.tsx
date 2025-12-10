@@ -104,28 +104,30 @@ export const InventoryManager: React.FC = () => {
         if (newQty === 0) newStatus = ItemStatus.EMPTY;
         else if (newQty < item.quantityInitial) newStatus = ItemStatus.USED;
 
-        const updatedItem = { ...item, quantityCurrent: newQty, status: newStatus };
+        const changes = { quantityCurrent: newQty, status: newStatus };
+        const updatedItem = { ...item, ...changes };
 
         setProject(prev => ({
             ...prev,
             items: prev.items.map(i => i.id === id ? updatedItem : i)
         }));
 
-        if (updateItem) await updateItem(updatedItem);
+        if (updateItem) await updateItem({ id, ...changes });
     };
 
     const markAsBought = async (id: string) => {
         const item = project.items.find(i => i.id === id);
         if (!item) return;
 
-        const updatedItem = { ...item, isBought: true };
+        const changes = { isBought: true };
+        const updatedItem = { ...item, ...changes };
 
         setProject(prev => ({
             ...prev,
             items: prev.items.map(i => i.id === id ? updatedItem : i)
         }));
 
-        if (updateItem) await updateItem(updatedItem);
+        if (updateItem) await updateItem({ id, ...changes });
         markNotificationAsReadByItemId(id);
     };
 
@@ -133,14 +135,15 @@ export const InventoryManager: React.FC = () => {
         const item = project.items.find(i => i.id === id);
         if (!item) return;
 
-        const updatedItem = { ...item, purchased: true, isBought: false };
+        const changes = { purchased: true, isBought: false };
+        const updatedItem = { ...item, ...changes };
 
         setProject(prev => ({
             ...prev,
             items: prev.items.map(i => i.id === id ? updatedItem : i)
         }));
 
-        if (updateItem) await updateItem(updatedItem);
+        if (updateItem) await updateItem({ id, ...changes });
         markNotificationAsReadByItemId(id);
     };
 
@@ -150,14 +153,15 @@ export const InventoryManager: React.FC = () => {
 
         const currentStarted = item.quantityStarted || 0;
         if (currentStarted < item.quantityCurrent) {
-            const updatedItem = { ...item, quantityStarted: currentStarted + 1, status: ItemStatus.USED };
+            const changes = { quantityStarted: currentStarted + 1, status: ItemStatus.USED };
+            const updatedItem = { ...item, ...changes };
 
             setProject(prev => ({
                 ...prev,
                 items: prev.items.map(i => i.id === id ? updatedItem : i)
             }));
 
-            if (updateItem) await updateItem(updatedItem);
+            if (updateItem) await updateItem({ id, ...changes });
         }
     };
 
@@ -179,14 +183,15 @@ export const InventoryManager: React.FC = () => {
             );
         }
 
-        const updatedItem = { ...item, surplusAction: action };
+        const changes = { surplusAction: action };
+        const updatedItem = { ...item, ...changes };
 
         setProject(prev => ({
             ...prev,
             items: prev.items.map(i => i.id === id ? updatedItem : i)
         }));
 
-        if (updateItem) await updateItem(updatedItem);
+        if (updateItem) await updateItem({ id, ...changes });
     };
 
     const handleSurplusClick = (item: any, action: SurplusAction) => {

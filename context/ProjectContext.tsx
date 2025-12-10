@@ -48,7 +48,7 @@ interface ProjectContextType {
 
   // Firestore Actions
   addItem: (item: ConsumableItem) => Promise<void>;
-  updateItem: (item: ConsumableItem) => Promise<void>;
+  updateItem: (item: Partial<ConsumableItem> & { id: string }) => Promise<void>;
   deleteItem: (itemId: string) => Promise<void>;
 
   currentDept: string;
@@ -430,7 +430,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
-  const updateItem = async (item: ConsumableItem) => {
+  const updateItem = async (item: Partial<ConsumableItem> & { id: string }) => {
     if (!item.id) return;
     const projectId = project.id;
     const itemRef = doc(db, 'projects', projectId, 'items', item.id);
