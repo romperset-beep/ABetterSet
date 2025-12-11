@@ -103,6 +103,14 @@ export const BuyBackMarketplace: React.FC = () => {
                                     </div>
                                 )}
 
+                                {item.status === 'SOLD' && (
+                                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-sm">
+                                        <div className="bg-green-500 text-black px-4 py-2 rounded-lg font-bold transform -rotate-6 shadow-xl border-2 border-white">
+                                            VENDU
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Delete Button for Seller or Admin */}
                                 {(user?.department === 'PRODUCTION' || user?.department === item.sellerDepartment) && (
                                     <button
@@ -112,7 +120,7 @@ export const BuyBackMarketplace: React.FC = () => {
                                                 deleteBuyBackItem(item.id);
                                             }
                                         }}
-                                        className="absolute top-2 left-2 bg-red-500/90 hover:bg-red-600 text-white p-1.5 rounded-lg shadow-lg border border-red-400 transition-all opacity-0 group-hover:opacity-100"
+                                        className="absolute top-2 left-2 bg-red-500/90 hover:bg-red-600 text-white p-1.5 rounded-lg shadow-lg border border-red-400 transition-all z-10"
                                         title="Supprimer l'annonce"
                                     >
                                         <Trash2 className="h-4 w-4" />
