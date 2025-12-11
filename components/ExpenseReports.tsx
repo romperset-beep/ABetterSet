@@ -15,8 +15,75 @@ export const ExpenseReports: React.FC = () => {
     const [expandedDepts, setExpandedDepts] = useState<Record<string, boolean>>({});
     const [expandedUsers, setExpandedUsers] = useState<Record<string, boolean>>({});
 
-    // ... (rest of logic unchanged) ...
+    const isAdmin = user?.department === 'PRODUCTION';
 
+    // Toggle Helpers
+    const toggleDept = (dept: string) => setExpandedDepts(prev => ({ ...prev, [dept]: !prev[dept] }));
+    const toggleUser = (uName: string) => setExpandedUsers(prev => ({ ...prev, [uName]: !prev[uName] }));
+
+    // Determine effective view mode
+    const currentViewMode = isAdmin ? viewMode : 'PERSONAL';
+
+    // 1. Get Personal Reports (Sorted Date Desc)
+    const myReports = expenseReports
+        .filter(r => r.submittedBy === user?.name)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // 2. Get Team Reports (Admin Mode)
+    // 2a. Pending Reports (Flat List)
+    const pendingReports = expenseReports
+        .filter(r => r.status === ExpenseStatus.PENDING)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // 2b. Validated/Rejected Reports (Grouped by Dept > User)
+    const processedReports = expenseReports
+        .filter(r => r.status !== ExpenseStatus.PENDING)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // Grouping Logic
+    const groupedReports = processedReports.reduce((acc, report) => {
+        const dept = report.department || 'Inconnu';
+        if (!acc[dept]) acc[dept] = {};
+
+        const userName = report.submittedBy;
+        if (!acc[dept][userName]) acc[dept][userName] = [];
+
+        acc[dept][userName].push(report);
+        return acc;
+    }, {} as Record<string, Record<string, ExpenseReport[]>>);
+
+    const departments = Object.keys(groupedReports).sort();
+
+    // Helper: Compute Total Validate for a User's reports (in the archive list)
+    const getUserTotal = (reports: ExpenseReport[]) =>
+        reports
+            .filter(r => r.status === ExpenseStatus.APPROVED)
+            .reduce((sum, r) => sum + r.amountTTC, 0);
+
+    // --- Render Components ---
+
+    const StatusBadge = ({ status }: { status: ExpenseStatus }) => {
+        switch (status) {
+            case ExpenseStatus.APPROVED:
+                return (
+                    <span className="text-green-400 bg-green-900/20 border border-green-500/30 px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3" /> Validé
+                    </span>
+                );
+            case ExpenseStatus.REJECTED:
+                return (
+                    <span className="text-red-400 bg-red-900/20 border border-red-500/30 px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
+                        <XCircle className="h-3 w-3" /> Refusé
+                    </span>
+                );
+            default:
+                return (
+                    <span className="text-orange-400 bg-orange-900/20 border border-orange-500/30 px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
+                        <Clock className="h-3 w-3" /> En attente
+                    </span>
+                );
+        }
+    };
     const ReportCard = ({ report, showActions = false }: { report: ExpenseReport; showActions?: boolean }) => (
         <div className="bg-cinema-800 p-4 rounded-lg border border-cinema-700 flex flex-col md:flex-row gap-4 hover:bg-cinema-700/30 transition-colors">
             {/* Info */}
