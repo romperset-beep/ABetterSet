@@ -241,25 +241,25 @@ export const ImpactReport: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="bg-cinema-800 p-6 rounded-xl border border-cinema-700 h-96">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-lg font-bold text-white">Cycle de Vie des Consommables</h3>
-                            <div className="flex bg-cinema-900 rounded-lg p-1">
+                    <div className="bg-cinema-800 p-6 rounded-xl border border-cinema-700 h-[28rem] md:h-96">
+                        <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+                            <h3 className="text-lg font-bold text-white text-center md:text-left">Cycle de Vie des Consommables</h3>
+                            <div className="flex bg-cinema-900 rounded-lg p-1 w-full md:w-auto justify-center md:justify-start overflow-x-auto">
                                 <button
                                     onClick={() => setChartView('quantity')}
-                                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${chartView === 'quantity' ? 'bg-cinema-700 text-white' : 'text-slate-400 hover:text-white'}`}
+                                    className={`flex-1 md:flex-none px-3 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${chartView === 'quantity' ? 'bg-cinema-700 text-white' : 'text-slate-400 hover:text-white'}`}
                                 >
                                     Quantité
                                 </button>
                                 <button
                                     onClick={() => setChartView('money')}
-                                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${chartView === 'money' ? 'bg-cinema-700 text-white' : 'text-slate-400 hover:text-white'}`}
+                                    className={`flex-1 md:flex-none px-3 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${chartView === 'money' ? 'bg-cinema-700 text-white' : 'text-slate-400 hover:text-white'}`}
                                 >
                                     Économie (€)
                                 </button>
                                 <button
                                     onClick={() => setChartView('co2')}
-                                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${chartView === 'co2' ? 'bg-cinema-700 text-white' : 'text-slate-400 hover:text-white'}`}
+                                    className={`flex-1 md:flex-none px-3 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${chartView === 'co2' ? 'bg-cinema-700 text-white' : 'text-slate-400 hover:text-white'}`}
                                 >
                                     Carbone (CO2)
                                 </button>
