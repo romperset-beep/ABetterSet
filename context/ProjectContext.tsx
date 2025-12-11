@@ -603,6 +603,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     } catch (err: any) {
       console.error("[BuyBack] Confirm Error:", err);
       setError(`Erreur confirmation: ${err.message}`);
+      alert(`Erreur lors de la confirmation : ${err.message}`); // Added for visibility
     }
   };
 
