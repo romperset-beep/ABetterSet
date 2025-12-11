@@ -189,8 +189,16 @@ export const analyzeReceipt = async (file: File): Promise<{ data: any, rawRespon
 
     const prompt = `
       Analyze this receipt image.
-      Extract: merchantName, date, amountTTC, amountTVA, amountHT, items (list).
-      Return ONLY JSON.
+      Extract the following fields into a valid JSON object:
+      - merchantName: string (name of the merchant)
+      - date: string (YYYY-MM-DD format)
+      - amountTTC: number (Total amount including tax)
+      - amountTVA: number (Total tax amount)
+      - amountHT: number (Total amount excluding tax)
+      - items: string[] (List of item names)
+      
+      If a value is missing or unclear, use null or 0.
+      Return ONLY the JSON object.
     `;
 
     const result = await model.generateContent([prompt, imagePart]);

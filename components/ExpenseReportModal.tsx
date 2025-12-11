@@ -140,7 +140,7 @@ export const ExpenseReportModal: React.FC<ExpenseReportModalProps> = ({ isOpen, 
         setPreviewUrl(URL.createObjectURL(selectedFile));
         setStep('REVIEW');
         setError(null);
-        // setIsAnalyzing(true); // AI disabled for stability
+        setIsAnalyzing(true);
 
         // 2. Background Processing (Compression only)
         setTimeout(async () => {
@@ -162,13 +162,30 @@ export const ExpenseReportModal: React.FC<ExpenseReportModalProps> = ({ isOpen, 
                     // setError("Image volumineuse, compression appliquée.");
                 }
 
-                // AI ANALYSIS DISABLED TO PREVENT CRASHES
-                /*
+                // AI Analysis
                 const result = await analyzeReceipt(fileToProcess);
                 if (result.data) {
-                   ...
+                    console.log("AI Analysis Result:", result.data);
+
+                    let ht = safeParseFloat(result.data.amountHT);
+                    let ttc = safeParseFloat(result.data.amountTTC);
+                    let tva = safeParseFloat(result.data.amountTVA);
+
+                    // Auto-complete missing values if 2 are present
+                    if (ttc > 0 && tva > 0 && ht === 0) ht = parseFloat((ttc - tva).toFixed(2));
+                    else if (ht > 0 && tva > 0 && ttc === 0) ttc = parseFloat((ht + tva).toFixed(2));
+                    else if (ttc > 0 && ht > 0 && tva === 0) tva = parseFloat((ttc - ht).toFixed(2));
+
+                    setFormData(prev => ({
+                        ...prev,
+                        merchantName: result.data.merchantName || prev.merchantName,
+                        date: result.data.date || prev.date,
+                        amountTTC: ttc,
+                        amountTVA: tva,
+                        amountHT: ht,
+                        items: result.data.items?.length > 0 ? result.data.items : prev.items
+                    }));
                 }
-                */
 
             } catch (err) {
                 console.error("File processing failed:", err);
