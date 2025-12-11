@@ -110,6 +110,8 @@ export interface BuyBackItem {
   photo?: string; // URL or Base64
   sellerDepartment: Department | 'PRODUCTION';
   reservedBy: Department | 'PRODUCTION' | null;
+  reservedByName?: string; // Name of the user who reserved
+  reservedByUserId?: string; // ID of the user who reserved
   status: 'AVAILABLE' | 'RESERVED' | 'SOLD';
   date: string; // ISO Date
 }

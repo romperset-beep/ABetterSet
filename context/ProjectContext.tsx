@@ -84,6 +84,7 @@ interface ProjectContextType {
   buyBackItems: BuyBackItem[];
   addBuyBackItem: (item: BuyBackItem) => void;
   toggleBuyBackReservation: (itemId: string, department: Department | 'PRODUCTION') => void;
+  confirmBuyBackTransaction: (itemId: string) => Promise<void>;
   socialPosts: SocialPost[];
   addSocialPost: (post: SocialPost) => void;
   deleteSocialPost: (postId: string, photoUrl?: string) => Promise<void>; // Added
@@ -573,10 +574,14 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       const isReservedByMe = item.reservedBy === department;
       const newStatus = isReservedByMe ? 'AVAILABLE' : 'RESERVED';
       const newReservedBy = isReservedByMe ? null : department;
+      const newReservedByName = isReservedByMe ? null : (user?.name || 'Inconnu');
+      const newReservedByUserId = isReservedByMe ? null : (user ? (user as any).uid /* fallback if not in User type yet */ || null : null);
 
       await updateDoc(itemRef, {
         status: newStatus,
-        reservedBy: newReservedBy
+        reservedBy: newReservedBy,
+        reservedByName: newReservedByName,
+        reservedByUserId: newReservedByUserId
       });
 
     } catch (err: any) {
@@ -585,675 +590,696 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
-  // Helper to generate consistent Project ID
-  const generateProjectId = (prod: string, film: string) => {
-    const combined = `${prod}-${film}`;
-    return combined.toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // Remove accents
-      .replace(/[^a-z0-9]+/g, '-')     // Replace non-alphanumeric with dash
-      .replace(/^-+|-+$/g, '')         // Trim dashes
-      || 'demo-project';
+} catch (err: any) {
+  console.error("[BuyBack] Reserve Error:", err);
+  setError(`Erreur réservation: ${err.message}`);
+}
   };
 
-  // Auth State Listener
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        console.log("Auth State: Logged In", firebaseUser.uid);
-        // Fetch User Profile from Firestore
-        const userRef = doc(db, 'users', firebaseUser.uid);
-        try {
-          const userSnap = await getDoc(userRef);
-          if (userSnap.exists()) {
-            const userData = userSnap.data() as User;
-            setUser(userData);
-
-            // Security: Enforce View restriction for non-production users
-            if (userData.department !== 'PRODUCTION') {
-              setCurrentDept(userData.department);
-            } else {
-              setCurrentDept('PRODUCTION');
-            }
-          } else {
-            console.log("Auth Logged in but no firestore profile found. Auto-repairing...");
-            // Auto-Repair: Create default profile
-            const recoveredUser: User = {
-              name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Utilisateur',
-              email: firebaseUser.email || '',
-              department: 'PRODUCTION', // Default safe fallback
-              productionName: 'Demo Prod',
-              filmTitle: 'Demo Film'
-            };
-
-            await setDoc(userRef, recoveredUser);
-            setUser(recoveredUser);
-            addNotification("Profil récupéré automatiquement", "INFO", "PRODUCTION");
-          }
-        } catch (e) {
-          console.error("Error fetching user profile", e);
-        }
-      } else {
-        console.log("Auth State: Logged Out");
-        setUser(null);
-        setProject(DEFAULT_PROJECT);
-      }
+const confirmBuyBackTransaction = async (itemId: string) => {
+  try {
+    const projectId = project.id;
+    const itemRef = doc(db, 'projects', projectId, 'buyBackItems', itemId);
+    await updateDoc(itemRef, {
+      status: 'SOLD'
     });
-    return () => unsubscribe();
-  }, []);
+    addNotification("Transaction confirmée : Article récupéré", "SUCCESS", "PRODUCTION");
+  } catch (err: any) {
+    console.error("[BuyBack] Confirm Error:", err);
+    setError(`Erreur confirmation: ${err.message}`);
+  }
+};
 
-  const register = async (email: string, pass: string, name: string, dept: Department | 'PRODUCTION') => {
-    try {
-      const cred = await createUserWithEmailAndPassword(auth, email, pass);
-      // Create User Profile
-      const newUser: User = {
-        name,
-        email,
-        department: dept,
-        productionName: '', // Initially empty
-        filmTitle: ''       // Initially empty
-      };
-      await setDoc(doc(db, 'users', cred.user.uid), newUser);
+// Helper to generate consistent Project ID
+const generateProjectId = (prod: string, film: string) => {
+  const combined = `${prod}-${film}`;
+  return combined.toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove accents
+    .replace(/[^a-z0-9]+/g, '-')     // Replace non-alphanumeric with dash
+    .replace(/^-+|-+$/g, '')         // Trim dashes
+    || 'demo-project';
+};
 
-      // FIX: Explicitly set user state here to avoid race condition with onAuthStateChanged
-      setUser(newUser);
-
-      addNotification(`Bienvenue ${name} !`, 'INFO', dept);
-    } catch (err: any) {
-      console.error("Registration Error", err);
-      throw err; // Propagate to UI
-    }
-  };
-
-  const login = async (email: string, pass: string) => {
-    try {
-      await signInWithEmailAndPassword(auth, email, pass);
-    } catch (err: any) {
-      console.error("Login Error", err);
-      throw err;
-    }
-  };
-
-  const joinProject = async (prod: string, film: string, start?: string, end?: string, type?: string) => {
-    if (!auth.currentUser || !user) return;
-
-    const projectId = generateProjectId(prod, film);
-
-    // 1. Update Local Project State
-    setProject(prev => ({
-      ...prev,
-      id: projectId,
-      name: film,
-      productionCompany: prod,
-      shootingStartDate: start || prev.shootingStartDate,
-      shootingEndDate: end || prev.shootingEndDate,
-      projectType: type || prev.projectType
-    }));
-
-    // 1.5 Persist Project Metadata to Firestore (Important for Sync)
-    // Only if we have valid data (at least prod and film)
-    if (prod && film) {
+// Auth State Listener
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    if (firebaseUser) {
+      console.log("Auth State: Logged In", firebaseUser.uid);
+      // Fetch User Profile from Firestore
+      const userRef = doc(db, 'users', firebaseUser.uid);
       try {
-        const projectRef = doc(db, 'projects', projectId);
-        // setDoc with merge: true ensures we create it if missing, or update if existing.
-        // We only update dates if they are provided, otherwise we keep existing ones to avoid overwriting with nulls.
-        const projectUpdates: any = {
-          name: film,
-          productionCompany: prod,
-          id: projectId
-        };
-        if (start) projectUpdates.shootingStartDate = start;
-        if (end) projectUpdates.shootingEndDate = end;
-        if (type) projectUpdates.projectType = type;
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          const userData = userSnap.data() as User;
+          setUser(userData);
 
-        // Ensure basic structure exists
-        await setDoc(projectRef, projectUpdates, { merge: true });
-        console.log("[joinProject] Project metadata synced to Firestore:", projectUpdates);
-      } catch (err) {
-        console.error("[joinProject] Failed to sync project metadata:", err);
+          // Security: Enforce View restriction for non-production users
+          if (userData.department !== 'PRODUCTION') {
+            setCurrentDept(userData.department);
+          } else {
+            setCurrentDept('PRODUCTION');
+          }
+        } else {
+          console.log("Auth Logged in but no firestore profile found. Auto-repairing...");
+          // Auto-Repair: Create default profile
+          const recoveredUser: User = {
+            name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Utilisateur',
+            email: firebaseUser.email || '',
+            department: 'PRODUCTION', // Default safe fallback
+            productionName: 'Demo Prod',
+            filmTitle: 'Demo Film'
+          };
+
+          await setDoc(userRef, recoveredUser);
+          setUser(recoveredUser);
+          addNotification("Profil récupéré automatiquement", "INFO", "PRODUCTION");
+        }
+      } catch (e) {
+        console.error("Error fetching user profile", e);
       }
+    } else {
+      console.log("Auth State: Logged Out");
+      setUser(null);
+      setProject(DEFAULT_PROJECT);
     }
+  });
+  return () => unsubscribe();
+}, []);
 
-    // 2. Update Persisted User Profile with new current project
-    const updatedUser: User = {
-      ...user,
-      productionName: prod,
-      filmTitle: film,
-      startDate: start,
-      endDate: end,
-      projectType: type,
-      currentProjectId: projectId // Added
+const register = async (email: string, pass: string, name: string, dept: Department | 'PRODUCTION') => {
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    // Create User Profile
+    const newUser: User = {
+      name,
+      email,
+      department: dept,
+      productionName: '', // Initially empty
+      filmTitle: ''       // Initially empty
     };
-    setUser(updatedUser); // Optimistic
+    await setDoc(doc(db, 'users', cred.user.uid), newUser);
 
-    await updateDoc(doc(db, 'users', auth.currentUser.uid), {
-      productionName: prod,
-      filmTitle: film,
-      startDate: start || null,
-      endDate: end || null,
-      projectType: type || null,
-      currentProjectId: projectId, // Persist current project ID
-      projectHistory: arrayUnion({
-        id: projectId,
-        productionName: prod,
-        filmTitle: film,
-        lastAccess: new Date().toISOString()
-      })
-    });
+    // FIX: Explicitly set user state here to avoid race condition with onAuthStateChanged
+    setUser(newUser);
 
-    // Update local user state specifically for history
-    const newHistoryItem: ProjectSummary = {
+    addNotification(`Bienvenue ${name} !`, 'INFO', dept);
+  } catch (err: any) {
+    console.error("Registration Error", err);
+    throw err; // Propagate to UI
+  }
+};
+
+const login = async (email: string, pass: string) => {
+  try {
+    await signInWithEmailAndPassword(auth, email, pass);
+  } catch (err: any) {
+    console.error("Login Error", err);
+    throw err;
+  }
+};
+
+const joinProject = async (prod: string, film: string, start?: string, end?: string, type?: string) => {
+  if (!auth.currentUser || !user) return;
+
+  const projectId = generateProjectId(prod, film);
+
+  // 1. Update Local Project State
+  setProject(prev => ({
+    ...prev,
+    id: projectId,
+    name: film,
+    productionCompany: prod,
+    shootingStartDate: start || prev.shootingStartDate,
+    shootingEndDate: end || prev.shootingEndDate,
+    projectType: type || prev.projectType
+  }));
+
+  // 1.5 Persist Project Metadata to Firestore (Important for Sync)
+  // Only if we have valid data (at least prod and film)
+  if (prod && film) {
+    try {
+      const projectRef = doc(db, 'projects', projectId);
+      // setDoc with merge: true ensures we create it if missing, or update if existing.
+      // We only update dates if they are provided, otherwise we keep existing ones to avoid overwriting with nulls.
+      const projectUpdates: any = {
+        name: film,
+        productionCompany: prod,
+        id: projectId
+      };
+      if (start) projectUpdates.shootingStartDate = start;
+      if (end) projectUpdates.shootingEndDate = end;
+      if (type) projectUpdates.projectType = type;
+
+      // Ensure basic structure exists
+      await setDoc(projectRef, projectUpdates, { merge: true });
+      console.log("[joinProject] Project metadata synced to Firestore:", projectUpdates);
+    } catch (err) {
+      console.error("[joinProject] Failed to sync project metadata:", err);
+    }
+  }
+
+  // 2. Update Persisted User Profile with new current project
+  const updatedUser: User = {
+    ...user,
+    productionName: prod,
+    filmTitle: film,
+    startDate: start,
+    endDate: end,
+    projectType: type,
+    currentProjectId: projectId // Added
+  };
+  setUser(updatedUser); // Optimistic
+
+  await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+    productionName: prod,
+    filmTitle: film,
+    startDate: start || null,
+    endDate: end || null,
+    projectType: type || null,
+    currentProjectId: projectId, // Persist current project ID
+    projectHistory: arrayUnion({
       id: projectId,
       productionName: prod,
       filmTitle: film,
       lastAccess: new Date().toISOString()
-    };
+    })
+  });
 
-    // Remove existing entry if present (to avoid duplicates/update date) and add new one
+  // Update local user state specifically for history
+  const newHistoryItem: ProjectSummary = {
+    id: projectId,
+    productionName: prod,
+    filmTitle: film,
+    lastAccess: new Date().toISOString()
+  };
+
+  // Remove existing entry if present (to avoid duplicates/update date) and add new one
+  const currentHistory = user.projectHistory || [];
+  const updatedHistory = [
+    newHistoryItem,
+    ...currentHistory.filter(p => p.id !== projectId)
+  ];
+
+  setUser({
+    ...updatedUser,
+    projectHistory: updatedHistory
+  });
+
+  addNotification(`Bienvenue sur le plateau de "${film}" !`, 'INFO', user.department);
+};
+
+const leaveProject = async () => {
+  if (!auth.currentUser || !user) return;
+
+  // 1. Reset Local State
+  setProject(DEFAULT_PROJECT);
+
+  // 2. Clear persisted project info in Firestore
+  const updatedUser: User = {
+    ...user,
+    productionName: '',
+    filmTitle: '',
+    startDate: undefined,
+    endDate: undefined
+  };
+  setUser(updatedUser);
+
+  await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+    productionName: '',
+    filmTitle: '',
+    startDate: null,
+    endDate: null
+  });
+};
+
+const deleteProject = async (projectId: string) => {
+  if (!auth.currentUser || !user) return;
+
+  // Safety check: Only romperset@gmail.com can delete
+  if (user.email !== 'romperset@gmail.com') {
+    throw new Error("Action non autorisée");
+  }
+
+  try {
+    console.log(`[deleteProject] Deleting project: ${projectId}`);
+
+    // 1. Delete Project Document
+    const projectRef = doc(db, 'projects', projectId);
+    await deleteDoc(projectRef);
+
+    // 2. Remove from Current User History (Admin)
     const currentHistory = user.projectHistory || [];
-    const updatedHistory = [
-      newHistoryItem,
-      ...currentHistory.filter(p => p.id !== projectId)
-    ];
+    const updatedHistory = currentHistory.filter(p => p.id !== projectId);
 
-    setUser({
-      ...updatedUser,
+    const userRef = doc(db, 'users', auth.currentUser.uid);
+    await updateDoc(userRef, {
+      projectHistory: updatedHistory,
+      // If current project is the deleted one, reset fields
+      ...(user.filmTitle === project.name && user.productionName === project.productionCompany ? {
+        productionName: '',
+        filmTitle: '',
+        startDate: null,
+        endDate: null,
+        projectType: null
+      } : {})
+    });
+
+    // Update local state
+    setUser(prev => prev ? ({ ...prev, projectHistory: updatedHistory }) : null);
+
+    // If we are currently ON this project, force switch to default
+    if (project.id === projectId) {
+      setProject(DEFAULT_PROJECT);
+      setUser(prev => prev ? ({
+        ...prev,
+        productionName: '',
+        filmTitle: '',
+        startDate: undefined,
+        endDate: undefined
+      }) : null);
+    }
+
+    addNotification("Projet supprimé définitivement", "SUCCESS", "PRODUCTION");
+
+  } catch (err: any) {
+    console.error("[deleteProject] Error:", err);
+    throw err;
+  }
+};
+
+const removeProjectFromHistory = async (projectId: string) => {
+  if (!auth.currentUser || !user) return;
+
+  try {
+    const currentHistory = user.projectHistory || [];
+    const updatedHistory = currentHistory.filter(p => p.id !== projectId);
+
+    const userRef = doc(db, 'users', auth.currentUser.uid);
+    await updateDoc(userRef, {
       projectHistory: updatedHistory
     });
 
-    addNotification(`Bienvenue sur le plateau de "${film}" !`, 'INFO', user.department);
-  };
+    // Update local state
+    setUser(prev => prev ? ({ ...prev, projectHistory: updatedHistory }) : null);
 
-  const leaveProject = async () => {
-    if (!auth.currentUser || !user) return;
+  } catch (err: any) {
+    console.error("[removeProjectFromHistory] Error:", err);
+    throw err;
+  }
+};
+const logout = async () => {
+  await signOut(auth);
+  localStorage.removeItem('aBetterSetUser'); // Clean legacy
+  setCurrentDept('PRODUCTION');
+  setProject(DEFAULT_PROJECT);
+};
 
-    // 1. Reset Local State
-    setProject(DEFAULT_PROJECT);
+// 3. Sync Notifications
+useEffect(() => {
+  const projectId = project.id;
+  if (!projectId || projectId === 'default-project') return;
 
-    // 2. Clear persisted project info in Firestore
-    const updatedUser: User = {
-      ...user,
-      productionName: '',
-      filmTitle: '',
-      startDate: undefined,
-      endDate: undefined
-    };
-    setUser(updatedUser);
+  const notifsRef = collection(db, 'projects', projectId, 'notifications');
+  const q = query(notifsRef, orderBy('date', 'desc'));
 
-    await updateDoc(doc(db, 'users', auth.currentUser.uid), {
-      productionName: '',
-      filmTitle: '',
-      startDate: null,
-      endDate: null
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const notifs: Notification[] = [];
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      notifs.push({
+        id: doc.id,
+        ...data,
+        date: data.date?.toDate ? data.date.toDate() : new Date(data.date)
+      } as Notification);
     });
-  };
-
-  const deleteProject = async (projectId: string) => {
-    if (!auth.currentUser || !user) return;
-
-    // Safety check: Only romperset@gmail.com can delete
-    if (user.email !== 'romperset@gmail.com') {
-      throw new Error("Action non autorisée");
-    }
-
-    try {
-      console.log(`[deleteProject] Deleting project: ${projectId}`);
-
-      // 1. Delete Project Document
-      const projectRef = doc(db, 'projects', projectId);
-      await deleteDoc(projectRef);
-
-      // 2. Remove from Current User History (Admin)
-      const currentHistory = user.projectHistory || [];
-      const updatedHistory = currentHistory.filter(p => p.id !== projectId);
-
-      const userRef = doc(db, 'users', auth.currentUser.uid);
-      await updateDoc(userRef, {
-        projectHistory: updatedHistory,
-        // If current project is the deleted one, reset fields
-        ...(user.filmTitle === project.name && user.productionName === project.productionCompany ? {
-          productionName: '',
-          filmTitle: '',
-          startDate: null,
-          endDate: null,
-          projectType: null
-        } : {})
-      });
-
-      // Update local state
-      setUser(prev => prev ? ({ ...prev, projectHistory: updatedHistory }) : null);
-
-      // If we are currently ON this project, force switch to default
-      if (project.id === projectId) {
-        setProject(DEFAULT_PROJECT);
-        setUser(prev => prev ? ({
-          ...prev,
-          productionName: '',
-          filmTitle: '',
-          startDate: undefined,
-          endDate: undefined
-        }) : null);
-      }
-
-      addNotification("Projet supprimé définitivement", "SUCCESS", "PRODUCTION");
-
-    } catch (err: any) {
-      console.error("[deleteProject] Error:", err);
-      throw err;
-    }
-  };
-
-  const removeProjectFromHistory = async (projectId: string) => {
-    if (!auth.currentUser || !user) return;
-
-    try {
-      const currentHistory = user.projectHistory || [];
-      const updatedHistory = currentHistory.filter(p => p.id !== projectId);
-
-      const userRef = doc(db, 'users', auth.currentUser.uid);
-      await updateDoc(userRef, {
-        projectHistory: updatedHistory
-      });
-
-      // Update local state
-      setUser(prev => prev ? ({ ...prev, projectHistory: updatedHistory }) : null);
-
-    } catch (err: any) {
-      console.error("[removeProjectFromHistory] Error:", err);
-      throw err;
-    }
-  };
-  const logout = async () => {
-    await signOut(auth);
-    localStorage.removeItem('aBetterSetUser'); // Clean legacy
-    setCurrentDept('PRODUCTION');
-    setProject(DEFAULT_PROJECT);
-  };
-
-  // 3. Sync Notifications
-  useEffect(() => {
-    const projectId = project.id;
-    if (!projectId || projectId === 'default-project') return;
-
-    const notifsRef = collection(db, 'projects', projectId, 'notifications');
-    const q = query(notifsRef, orderBy('date', 'desc'));
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const notifs: Notification[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        notifs.push({
-          id: doc.id,
-          ...data,
-          date: data.date?.toDate ? data.date.toDate() : new Date(data.date)
-        } as Notification);
-      });
-      setNotifications(notifs);
-    });
-
-    return () => unsubscribe();
-  }, [project.id]);
-
-  const addNotification = async (message: string, type: Notification['type'], target: Department | 'PRODUCTION' = 'PRODUCTION', itemId?: string) => {
-    try {
-      const projectId = project.id;
-      const notifsRef = collection(db, 'projects', projectId, 'notifications');
-
-      await addDoc(notifsRef, {
-        message,
-        type,
-        targetDept: target,
-        itemId: itemId || null,
-        read: false,
-        date: new Date()
-      });
-    } catch (err) {
-      console.error("Failed to send notification:", err);
-    }
-  };
-
-  const markAsRead = async (id: string) => {
-    // Optimistic update
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-
-    try {
-      const projectId = project.id;
-      const notifRef = doc(db, 'projects', projectId, 'notifications', id);
-      await updateDoc(notifRef, { read: true });
-    } catch (err) {
-      console.error("Failed to mark notification as read:", err);
-    }
-  };
-
-  const markNotificationAsReadByItemId = async (itemId: string) => {
-    // Find notifications related to this item
-    const targetNotifs = notifications.filter(n => n.itemId === itemId && !n.read);
-
-    // Optimistic update
-    setNotifications(prev => prev.map(n => n.itemId === itemId ? { ...n, read: true } : n));
-
-    try {
-      const projectId = project.id;
-      // Update all matching notifications in Firestore
-      const updatePromises = targetNotifs.map(n => {
-        const notifRef = doc(db, 'projects', projectId, 'notifications', n.id);
-        return updateDoc(notifRef, { read: true });
-      });
-      await Promise.all(updatePromises);
-    } catch (err) {
-      console.error("Failed to mark notifications as read by item:", err);
-    }
-  };
-
-  // 5. Sync Expense Reports
-  useEffect(() => {
-    const projectId = project.id;
-    if (!projectId || projectId === 'default-project') return;
-
-    const expensesRef = collection(db, 'projects', projectId, 'expenses');
-    const q = query(expensesRef, orderBy('date', 'desc'));
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const reports: ExpenseReport[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        reports.push({
-          id: doc.id,
-          ...data
-        } as ExpenseReport);
-      });
-      setExpenseReports(reports);
-    }, (err) => {
-      console.error("[ExpenseSync] Sync Error:", err);
-    });
-
-    return () => unsubscribe();
-  }, [project.id]);
-
-  const addExpenseReport = async (report: ExpenseReport) => {
-    try {
-      const projectId = project.id;
-      // Use setDoc with the ID we generated in the modal, or use addDoc and let firestore generate it?
-      // The modal generates an ID. Let's stick to it or overwrite it.
-      // Better: Use `setDoc` with `report.id` if we want to keep that ID, OR `addDoc` and update the ID.
-      // Since modal generates an ID, let's use it as document ID for consistency.
-      const reportRef = doc(db, 'projects', projectId, 'expenses', report.id);
-      const { id, ...reportData } = report;
-
-      // Sanitize undefined
-      const sanitizedData = Object.fromEntries(
-        Object.entries(reportData).map(([k, v]) => [k, v === undefined ? null : v])
-      );
-
-      await setDoc(reportRef, sanitizedData);
-
-      addNotification(
-        `Nouvelle note de frais de ${report.submittedBy} (${report.amountTTC.toFixed(2)}€)`,
-        'INFO',
-        'PRODUCTION'
-      );
-    } catch (err: any) {
-      console.error("Error adding expense report:", err);
-      setError(`Erreur sauvegarde note de frais: ${err.message}`);
-    }
-  };
-
-  const updateExpenseReportStatus = async (id: string, status: ExpenseStatus) => {
-    try {
-      const projectId = project.id;
-      const reportRef = doc(db, 'projects', projectId, 'expenses', id);
-      await updateDoc(reportRef, { status });
-    } catch (err: any) {
-      console.error("Error updating expense status:", err);
-      setError(`Erreur mise à jour status: ${err.message}`);
-    }
-  };
-
-  const userNotifications = notifications.filter(n => {
-    if (!user) return false;
-    if (user.department === 'PRODUCTION' || user.department === 'Régie') return true;
-    return n.targetDept === user.department || n.targetDept === undefined;
+    setNotifications(notifs);
   });
 
-  // 2. Sync Social Posts
-  useEffect(() => {
-    const projectId = project.id;
-    console.log(`[SocialWall] Init listener for project: ${projectId}`);
+  return () => unsubscribe();
+}, [project.id]);
 
-    if (!projectId || projectId === 'default-project') return;
+const addNotification = async (message: string, type: Notification['type'], target: Department | 'PRODUCTION' = 'PRODUCTION', itemId?: string) => {
+  try {
+    const projectId = project.id;
+    const notifsRef = collection(db, 'projects', projectId, 'notifications');
+
+    await addDoc(notifsRef, {
+      message,
+      type,
+      targetDept: target,
+      itemId: itemId || null,
+      read: false,
+      date: new Date()
+    });
+  } catch (err) {
+    console.error("Failed to send notification:", err);
+  }
+};
+
+const markAsRead = async (id: string) => {
+  // Optimistic update
+  setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+
+  try {
+    const projectId = project.id;
+    const notifRef = doc(db, 'projects', projectId, 'notifications', id);
+    await updateDoc(notifRef, { read: true });
+  } catch (err) {
+    console.error("Failed to mark notification as read:", err);
+  }
+};
+
+const markNotificationAsReadByItemId = async (itemId: string) => {
+  // Find notifications related to this item
+  const targetNotifs = notifications.filter(n => n.itemId === itemId && !n.read);
+
+  // Optimistic update
+  setNotifications(prev => prev.map(n => n.itemId === itemId ? { ...n, read: true } : n));
+
+  try {
+    const projectId = project.id;
+    // Update all matching notifications in Firestore
+    const updatePromises = targetNotifs.map(n => {
+      const notifRef = doc(db, 'projects', projectId, 'notifications', n.id);
+      return updateDoc(notifRef, { read: true });
+    });
+    await Promise.all(updatePromises);
+  } catch (err) {
+    console.error("Failed to mark notifications as read by item:", err);
+  }
+};
+
+// 5. Sync Expense Reports
+useEffect(() => {
+  const projectId = project.id;
+  if (!projectId || projectId === 'default-project') return;
+
+  const expensesRef = collection(db, 'projects', projectId, 'expenses');
+  const q = query(expensesRef, orderBy('date', 'desc'));
+
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const reports: ExpenseReport[] = [];
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      reports.push({
+        id: doc.id,
+        ...data
+      } as ExpenseReport);
+    });
+    setExpenseReports(reports);
+  }, (err) => {
+    console.error("[ExpenseSync] Sync Error:", err);
+  });
+
+  return () => unsubscribe();
+}, [project.id]);
+
+const addExpenseReport = async (report: ExpenseReport) => {
+  try {
+    const projectId = project.id;
+    // Use setDoc with the ID we generated in the modal, or use addDoc and let firestore generate it?
+    // The modal generates an ID. Let's stick to it or overwrite it.
+    // Better: Use `setDoc` with `report.id` if we want to keep that ID, OR `addDoc` and update the ID.
+    // Since modal generates an ID, let's use it as document ID for consistency.
+    const reportRef = doc(db, 'projects', projectId, 'expenses', report.id);
+    const { id, ...reportData } = report;
+
+    // Sanitize undefined
+    const sanitizedData = Object.fromEntries(
+      Object.entries(reportData).map(([k, v]) => [k, v === undefined ? null : v])
+    );
+
+    await setDoc(reportRef, sanitizedData);
+
+    addNotification(
+      `Nouvelle note de frais de ${report.submittedBy} (${report.amountTTC.toFixed(2)}€)`,
+      'INFO',
+      'PRODUCTION'
+    );
+  } catch (err: any) {
+    console.error("Error adding expense report:", err);
+    setError(`Erreur sauvegarde note de frais: ${err.message}`);
+  }
+};
+
+const updateExpenseReportStatus = async (id: string, status: ExpenseStatus) => {
+  try {
+    const projectId = project.id;
+    const reportRef = doc(db, 'projects', projectId, 'expenses', id);
+    await updateDoc(reportRef, { status });
+  } catch (err: any) {
+    console.error("Error updating expense status:", err);
+    setError(`Erreur mise à jour status: ${err.message}`);
+  }
+};
+
+const userNotifications = notifications.filter(n => {
+  if (!user) return false;
+  if (user.department === 'PRODUCTION' || user.department === 'Régie') return true;
+  return n.targetDept === user.department || n.targetDept === undefined;
+});
+
+// 2. Sync Social Posts
+useEffect(() => {
+  const projectId = project.id;
+  console.log(`[SocialWall] Init listener for project: ${projectId}`);
+
+  if (!projectId || projectId === 'default-project') return;
+
+  const postsRef = collection(db, 'projects', projectId, 'socialPosts');
+  const q = query(postsRef, orderBy('date', 'desc'));
+
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    console.log(`[SocialWall] Snapshot received. Docs: ${snapshot.size}`);
+    const posts: SocialPost[] = [];
+    snapshot.forEach((doc) => {
+      // Convert Firestore Timestamp to Date
+      const data = doc.data();
+      posts.push({
+        id: doc.id,
+        ...data,
+        date: data.date?.toDate ? data.date.toDate() : new Date(data.date)
+      } as SocialPost);
+    });
+    setSocialPosts(posts);
+  }, (err) => {
+    console.error("[SocialWall] Listener Error:", err);
+    setError(`Social Wall Sync Error: ${err.message}`);
+  });
+
+  return () => unsubscribe();
+}, [project.id]);
+
+const addSocialPost = async (post: SocialPost) => {
+  try {
+    const projectId = project.id;
+    console.log(`[SocialWall] Adding post to project: ${projectId}`);
 
     const postsRef = collection(db, 'projects', projectId, 'socialPosts');
-    const q = query(postsRef, orderBy('date', 'desc'));
+    const { id, ...postData } = post;
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      console.log(`[SocialWall] Snapshot received. Docs: ${snapshot.size}`);
-      const posts: SocialPost[] = [];
-      snapshot.forEach((doc) => {
-        // Convert Firestore Timestamp to Date
-        const data = doc.data();
-        posts.push({
-          id: doc.id,
-          ...data,
-          date: data.date?.toDate ? data.date.toDate() : new Date(data.date)
-        } as SocialPost);
-      });
-      setSocialPosts(posts);
-    }, (err) => {
-      console.error("[SocialWall] Listener Error:", err);
-      setError(`Social Wall Sync Error: ${err.message}`);
+    // Firestore doesn't support 'undefined', replace with null
+    const sanitizedData = Object.fromEntries(
+      Object.entries(postData).map(([k, v]) => [k, v === undefined ? null : v])
+    );
+
+    await addDoc(postsRef, {
+      ...sanitizedData,
+      date: new Date() // Ensure server timestamp
     });
+    console.log("[SocialWall] Post added successfully");
 
-    return () => unsubscribe();
-  }, [project.id]);
+    // Notification is handled by local state for now, or could be synced too
+    addNotification(
+      `Nouveau message de ${post.authorName} sur le mur social`,
+      'INFO',
+      'PRODUCTION'
+    );
+  } catch (err: any) {
+    console.error("[SocialWall] Add Error:", err);
+    setError(`Erreur d'envoi : ${err.message}`);
+    // alert(`Erreur d'envoi : ${err.message}`);
+  }
+};
 
-  const addSocialPost = async (post: SocialPost) => {
-    try {
-      const projectId = project.id;
-      console.log(`[SocialWall] Adding post to project: ${projectId}`);
+const deleteSocialPost = async (postId: string, photoUrl?: string) => {
+  try {
+    const projectId = project.id;
+    if (!projectId || projectId === 'default-project') return;
 
-      const postsRef = collection(db, 'projects', projectId, 'socialPosts');
-      const { id, ...postData } = post;
+    console.log(`[SocialWall] Deleting post: ${postId}`);
 
-      // Firestore doesn't support 'undefined', replace with null
-      const sanitizedData = Object.fromEntries(
-        Object.entries(postData).map(([k, v]) => [k, v === undefined ? null : v])
-      );
+    // 1. Delete Firestore Document
+    const postRef = doc(db, 'projects', projectId, 'socialPosts', postId);
+    await deleteDoc(postRef);
 
-      await addDoc(postsRef, {
-        ...sanitizedData,
-        date: new Date() // Ensure server timestamp
-      });
-      console.log("[SocialWall] Post added successfully");
-
-      // Notification is handled by local state for now, or could be synced too
-      addNotification(
-        `Nouveau message de ${post.authorName} sur le mur social`,
-        'INFO',
-        'PRODUCTION'
-      );
-    } catch (err: any) {
-      console.error("[SocialWall] Add Error:", err);
-      setError(`Erreur d'envoi : ${err.message}`);
-      // alert(`Erreur d'envoi : ${err.message}`);
-    }
-  };
-
-  const deleteSocialPost = async (postId: string, photoUrl?: string) => {
-    try {
-      const projectId = project.id;
-      if (!projectId || projectId === 'default-project') return;
-
-      console.log(`[SocialWall] Deleting post: ${postId}`);
-
-      // 1. Delete Firestore Document
-      const postRef = doc(db, 'projects', projectId, 'socialPosts', postId);
-      await deleteDoc(postRef);
-
-      // 2. Delete Photo from Storage if exists
-      if (photoUrl && photoUrl.includes('firebase')) {
-        try {
-          const photoRef = ref(getStorage(), photoUrl);
-          await deleteObject(photoRef);
-          console.log("[SocialWall] Photo deleted from storage");
-        } catch (storageErr) {
-          console.warn("[SocialWall] Failed to delete photo from storage (might be shared or already gone):", storageErr);
-        }
+    // 2. Delete Photo from Storage if exists
+    if (photoUrl && photoUrl.includes('firebase')) {
+      try {
+        const photoRef = ref(getStorage(), photoUrl);
+        await deleteObject(photoRef);
+        console.log("[SocialWall] Photo deleted from storage");
+      } catch (storageErr) {
+        console.warn("[SocialWall] Failed to delete photo from storage (might be shared or already gone):", storageErr);
       }
-
-      console.log("[SocialWall] Post deleted successfully");
-    } catch (err: any) {
-      console.error("[SocialWall] Delete Error:", err);
-      setError(`Erreur de suppression : ${err.message}`);
-      throw err;
     }
-  };
 
-  // 4. Sync User Profiles (Team Members)
-  useEffect(() => {
-    if (!project.name || project.id === 'default-project') return;
+    console.log("[SocialWall] Post deleted successfully");
+  } catch (err: any) {
+    console.error("[SocialWall] Delete Error:", err);
+    setError(`Erreur de suppression : ${err.message}`);
+    throw err;
+  }
+};
 
-    // We query users who are currently working on this film
-    const usersRef = collection(db, 'users');
+// 4. Sync User Profiles (Team Members)
+useEffect(() => {
+  if (!project.name || project.id === 'default-project') return;
 
-    // Improved Query: Try matching by ID first (Robust), fallback to name (Legacy)
-    // Actually, if we just use 'currentProjectId', only updated users will appear.
-    // Given the issue is "users don't see each other", enforcing ID match fixes it.
-    // They will just need to re-join the project.
+  // We query users who are currently working on this film
+  const usersRef = collection(db, 'users');
 
-    const q = query(usersRef, where('currentProjectId', '==', project.id));
+  // Improved Query: Try matching by ID first (Robust), fallback to name (Legacy)
+  // Actually, if we just use 'currentProjectId', only updated users will appear.
+  // Given the issue is "users don't see each other", enforcing ID match fixes it.
+  // They will just need to re-join the project.
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const profiles: UserProfile[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data() as User & Partial<UserProfile>; // Cast to union to access profile fields
+  const q = query(usersRef, where('currentProjectId', '==', project.id));
 
-        // Map User to UserProfile structure, preserving existing data if present
-        profiles.push({
-          id: doc.id,
-          email: data.email,
-          firstName: data.firstName || data.name.split(' ')[0] || '',
-          lastName: data.lastName || data.name.split(' ').slice(1).join(' ') || '',
-          department: data.department,
-          role: data.role || 'Membre',
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const profiles: UserProfile[] = [];
+    snapshot.forEach((doc) => {
+      const data = doc.data() as User & Partial<UserProfile>; // Cast to union to access profile fields
 
-          // Personal Info
-          address: data.address || '',
-          postalCode: data.postalCode || '',
-          city: data.city || '',
-          phone: data.phone || '',
-          familyStatus: data.familyStatus || '',
+      // Map User to UserProfile structure, preserving existing data if present
+      profiles.push({
+        id: doc.id,
+        email: data.email,
+        firstName: data.firstName || data.name.split(' ')[0] || '',
+        lastName: data.lastName || data.name.split(' ').slice(1).join(' ') || '',
+        department: data.department,
+        role: data.role || 'Membre',
 
-          // Admin Info
-          ssn: data.ssn || '',
-          birthPlace: data.birthPlace || '',
-          birthDate: data.birthDate || '',
-          birthDepartment: data.birthDepartment || '',
-          birthCountry: data.birthCountry || '',
-          nationality: data.nationality || '',
-          socialSecurityCenterAddress: data.socialSecurityCenterAddress || '',
+        // Personal Info
+        address: data.address || '',
+        postalCode: data.postalCode || '',
+        city: data.city || '',
+        phone: data.phone || '',
+        familyStatus: data.familyStatus || '',
 
-          // Emergency
-          emergencyContactName: data.emergencyContactName || '',
-          emergencyContactPhone: data.emergencyContactPhone || '',
+        // Admin Info
+        ssn: data.ssn || '',
+        birthPlace: data.birthPlace || '',
+        birthDate: data.birthDate || '',
+        birthDepartment: data.birthDepartment || '',
+        birthCountry: data.birthCountry || '',
+        nationality: data.nationality || '',
+        socialSecurityCenterAddress: data.socialSecurityCenterAddress || '',
 
-          // Professional
-          isRetired: data.isRetired || false,
-          congeSpectacleNumber: data.congeSpectacleNumber || '',
-          lastMedicalVisit: data.lastMedicalVisit || '',
+        // Emergency
+        emergencyContactName: data.emergencyContactName || '',
+        emergencyContactPhone: data.emergencyContactPhone || '',
 
-          // Documents
-          rib: data.rib,
-          cmbCard: data.cmbCard,
-          idCard: data.idCard,
-          drivingLicense: data.drivingLicense
-        });
+        // Professional
+        isRetired: data.isRetired || false,
+        congeSpectacleNumber: data.congeSpectacleNumber || '',
+        lastMedicalVisit: data.lastMedicalVisit || '',
+
+        // Documents
+        rib: data.rib,
+        cmbCard: data.cmbCard,
+        idCard: data.idCard,
+        drivingLicense: data.drivingLicense
       });
-      setUserProfiles(profiles);
-      console.log(`[TeamSync] Found ${profiles.length} team members`);
-    }, (err) => {
-      console.error("Team Sync Error:", err);
-      // Fallback: If index error, might just fail silently or log.
     });
+    setUserProfiles(profiles);
+    console.log(`[TeamSync] Found ${profiles.length} team members`);
+  }, (err) => {
+    console.error("Team Sync Error:", err);
+    // Fallback: If index error, might just fail silently or log.
+  });
 
-    return () => unsubscribe();
-  }, [project.name]);
+  return () => unsubscribe();
+}, [project.name]);
 
-  const updateUserProfile = (profile: UserProfile) => {
-    // Legacy local update, keeping it as is but it's less useful now with sync
-    setUserProfiles(prev => {
-      const existingIndex = prev.findIndex(p => p.email === profile.email);
-      if (existingIndex >= 0) {
-        const newProfiles = [...prev];
-        newProfiles[existingIndex] = profile;
-        return newProfiles;
-      }
-      return [...prev, profile];
-    });
-  };
+const updateUserProfile = (profile: UserProfile) => {
+  // Legacy local update, keeping it as is but it's less useful now with sync
+  setUserProfiles(prev => {
+    const existingIndex = prev.findIndex(p => p.email === profile.email);
+    if (existingIndex >= 0) {
+      const newProfiles = [...prev];
+      newProfiles[existingIndex] = profile;
+      return newProfiles;
+    }
+    return [...prev, profile];
+  });
+};
 
-  const unreadCount = project.items.filter(i =>
-    !i.purchased &&
-    (user?.department === 'PRODUCTION' || user?.department === 'Régie' || i.department === user?.department)
-  ).length;
+const unreadCount = project.items.filter(i =>
+  !i.purchased &&
+  (user?.department === 'PRODUCTION' || user?.department === 'Régie' || i.department === user?.department)
+).length;
 
-  return (
-    <ProjectContext.Provider value={{
-      project,
-      setProject,
-      updateProjectDetails,
-      joinProject,
-      leaveProject,
-      deleteProject, // Added
-      removeProjectFromHistory, // Added
-      addItem,
-      updateItem,
-      deleteItem,
-      currentDept,
-      setCurrentDept,
-      circularView,
-      setCircularView,
-      user,
-      login,
-      register,
-      logout,
-      notifications: userNotifications,
-      addNotification,
-      markAsRead,
-      markNotificationAsReadByItemId,
-      unreadCount,
-      unreadSocialCount,
-      unreadMarketplaceCount,
-      markSocialAsRead,
-      markMarketplaceAsRead,
-      expenseReports,
-      addExpenseReport,
-      updateExpenseReportStatus,
-      buyBackItems,
-      addBuyBackItem,
-      toggleBuyBackReservation,
-      socialPosts,
-      addSocialPost,
-      deleteSocialPost, // Added
-      callSheets,
-      addCallSheet,
+return (
+  <ProjectContext.Provider value={{
+    project,
+    setProject,
+    updateProjectDetails,
+    joinProject,
+    leaveProject,
+    deleteProject, // Added
+    removeProjectFromHistory, // Added
+    addItem,
+    updateItem,
+    deleteItem,
+    currentDept,
+    setCurrentDept,
+    circularView,
+    setCircularView,
+    user,
+    login,
+    register,
+    logout,
+    notifications: userNotifications,
+    addNotification,
+    markAsRead,
+    markNotificationAsReadByItemId,
+    unreadCount,
+    unreadSocialCount,
+    unreadMarketplaceCount,
+    markSocialAsRead,
+    markMarketplaceAsRead,
+    expenseReports,
+    addExpenseReport,
+    updateExpenseReportStatus,
+    buyBackItems,
+    addBuyBackItem,
+    toggleBuyBackReservation,
+    confirmBuyBackTransaction,
+    socialPosts,
+    addSocialPost,
+    deleteSocialPost, // Added
+    callSheets,
+    addCallSheet,
 
-      // Catalog
-      catalogItems,
-      addToCatalog,
+    // Catalog
+    catalogItems,
+    addToCatalog,
 
-      userProfiles,
-      updateUserProfile,
-      language,
-      setLanguage,
-      t,
-      error,
-      testConnection,
-      debugStatus,
-      lastLog
-    }}>
-      {children}
-    </ProjectContext.Provider>
-  );
+    userProfiles,
+    updateUserProfile,
+    language,
+    setLanguage,
+    t,
+    error,
+    testConnection,
+    debugStatus,
+    lastLog
+  }}>
+    {children}
+  </ProjectContext.Provider>
+);
 };
 
 export const useProject = () => {

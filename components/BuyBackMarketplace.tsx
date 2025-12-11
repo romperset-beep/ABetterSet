@@ -128,28 +128,51 @@ export const BuyBackMarketplace: React.FC = () => {
                                         <span>Mis en vente le {new Date(item.date).toLocaleDateString()}</span>
                                     </div>
 
-                                    <button
-                                        onClick={() => toggleBuyBackReservation(item.id, user?.department || 'PRODUCTION')}
-                                        disabled={item.status === 'RESERVED' && item.reservedBy !== user?.department && user?.department !== 'PRODUCTION'}
-                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${item.status === 'RESERVED'
-                                            ? item.reservedBy === user?.department
-                                                ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 hover:bg-yellow-500/30' // Reserved by me -> Click to unreserve
-                                                : 'bg-cinema-900 text-slate-500 cursor-not-allowed' // Reserved by others
-                                            : 'bg-cinema-700 hover:bg-yellow-500 hover:text-black text-white' // Available
-                                            }`}
-                                    >
-                                        {item.status === 'RESERVED' ? (
-                                            <>
+                                    {item.status === 'RESERVED' && (
+                                        <div className="flex flex-col gap-2 relative">
+                                            <button
+                                                onClick={() => toggleBuyBackReservation(item.id, user?.department || 'PRODUCTION')}
+                                                disabled={item.reservedBy !== user?.department && user?.department !== 'PRODUCTION'}
+                                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${item.reservedBy === user?.department
+                                                    ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 hover:bg-yellow-500/30'
+                                                    : 'bg-cinema-900 text-slate-500 cursor-not-allowed'
+                                                    }`}
+                                            >
                                                 <CheckSquare className="h-4 w-4" />
-                                                {item.reservedBy === user?.department ? 'Réservé (Annuler)' : `Réservé par ${item.reservedBy}`}
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Square className="h-4 w-4" />
-                                                Réserver
-                                            </>
-                                        )}
-                                    </button>
+                                                {item.reservedBy === user?.department
+                                                    ? 'Réservé (Annuler)'
+                                                    : `Réservé par ${item.reservedByName ? `${item.reservedByName} (${item.reservedBy})` : item.reservedBy}`
+                                                }
+                                            </button>
+
+                                            {/* Button to confirm collection */}
+                                            {(user?.department === 'PRODUCTION' || user?.department === item.sellerDepartment || user?.department === item.reservedBy) && (
+                                                <button
+                                                    onClick={() => confirmBuyBackTransaction(item.id)}
+                                                    className="flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-green-500/20 text-green-400 border border-green-500/50 hover:bg-green-500/30 transition-all"
+                                                >
+                                                    <span>Confirmer Récupération</span>
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {item.status === 'AVAILABLE' && (
+                                        <button
+                                            onClick={() => toggleBuyBackReservation(item.id, user?.department || 'PRODUCTION')}
+                                            className="bg-cinema-700 hover:bg-yellow-500 hover:text-black text-white flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                                        >
+                                            <Square className="h-4 w-4" />
+                                            Réserver
+                                        </button>
+                                    )}
+
+                                    {item.status === 'SOLD' && (
+                                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-cinema-900/50 text-slate-500 border border-cinema-700 cursor-default">
+                                            <CheckSquare className="h-4 w-4" />
+                                            Vendu / Récupéré
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
