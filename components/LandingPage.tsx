@@ -53,7 +53,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
                             <div className="mt-1 min-w-[20px]"><ShieldCheck className="h-5 w-5 text-purple-400" /></div>
                             <div>
                                 <h3 className="font-bold text-slate-200">Gestion Simplifiée</h3>
-                                <p className="text-sm text-slate-400">Suivez les stocks, les documents d'équipe et les fiches de service en temps réel.</p>
+                                <p className="text-sm text-slate-400">Suivez les stocks, les fiches de renseignements et les notes de frais en temps réel.</p>
                             </div>
                         </li>
                     </ul>
