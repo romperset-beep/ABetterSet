@@ -2,40 +2,46 @@ import React, { useState, useEffect } from 'react';
 import { OnboardingCarousel } from './OnboardingCarousel';
 import { AuthScreen } from './AuthScreen';
 import { ProjectSelection } from './ProjectSelection';
+import { LandingPage } from './LandingPage'; // Import new component
 import { useProject } from '../context/ProjectContext';
 import { Globe } from 'lucide-react';
-import { Clapperboard } from 'lucide-react';
 import { LottieAnimation } from './LottieAnimation';
 import { Language } from '../types';
 
 export const LoginPage: React.FC = () => {
     const { user, project, language, setLanguage, t } = useProject();
 
-    // State to track flow
-    const [showOnboarding, setShowOnboarding] = useState(true);
-    const [showProjectSelection, setShowProjectSelection] = useState(false);
+    // Flow State: 'landing' -> 'onboarding' -> 'auth' -> 'selection' (if needed)
+    type ViewState = 'landing' | 'onboarding' | 'auth' | 'selection';
+    const [view, setView] = useState<ViewState>('landing');
 
     // Check localStorage for "onboarding seen" flag
     useEffect(() => {
         const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding_v2');
         if (hasSeenOnboarding) {
-            setShowOnboarding(false);
+            setView('auth');
+        } else {
+            setView('landing');
         }
     }, []);
 
     // Check if user needs to select a project (Logged in but no project ID)
     useEffect(() => {
         if (user && (!project.id || project.id === 'default-project')) {
-            setShowProjectSelection(true);
+            setView('selection');
         } else if (user && project.id && project.id !== 'default-project') {
-            // Already active in a project, this component will unmount as parent switches to Dashboard
-            setShowProjectSelection(false);
+            // Already active in a project
+            // We don't need to do anything, App.tsx will switch to Dashboard
         }
     }, [user, project]);
 
+    const handleLandingStart = () => {
+        setView('onboarding');
+    };
+
     const handleOnboardingComplete = () => {
-        localStorage.setItem('hasSeenOnboarding_v1', 'true');
-        setShowOnboarding(false);
+        localStorage.setItem('hasSeenOnboarding_v2', 'true');
+        setView('auth');
     };
 
     const handleAuthSuccess = () => {
@@ -72,19 +78,15 @@ export const LoginPage: React.FC = () => {
             </div>
 
             {/* Flow Orchestration */}
-            {showOnboarding ? (
+            {view === 'landing' && (
+                <LandingPage onStart={handleLandingStart} />
+            )}
+
+            {view === 'onboarding' && (
                 <OnboardingCarousel onComplete={handleOnboardingComplete} language={language} />
-            ) : user ? (
-                // User is logged in
-                showProjectSelection ? (
-                    <ProjectSelection onProjectSelected={handleProjectSelected} />
-                ) : (
-                    // This state (User + Project) usually triggers unmount in App.tsx
-                    // But we show a loader just in case
-                    <div className="text-white animate-pulse">Chargement du plateau...</div>
-                )
-            ) : (
-                // User needs to Authenticate
+            )}
+
+            {view === 'auth' && !user && (
                 <div className="flex flex-col items-center w-full">
                     <div className="text-center mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
                         <div className="flex justify-center mb-4">
@@ -98,6 +100,18 @@ export const LoginPage: React.FC = () => {
                     <AuthScreen onSuccess={handleAuthSuccess} />
                 </div>
             )}
+
+            {view === 'selection' && user && (
+                <ProjectSelection onProjectSelected={handleProjectSelected} />
+            )}
+
+            {(view === 'auth' || view === 'selection') && user && !showProjectSelection && !project.id && (
+                // Loading state fallback
+                <div className="text-white animate-pulse">Chargement...</div>
+            )}
         </div>
     );
 };
+// Helper for fallback state
+const showProjectSelection = false; // Just to satisfy the conditional logic visualization above, strictly inside component logic effectively handled by state 'view'
+
