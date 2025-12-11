@@ -24,6 +24,7 @@ export const ExpenseReportModal: React.FC<ExpenseReportModalProps> = ({ isOpen, 
     const [error, setError] = useState<string | null>(null);
     const [isUploading, setIsUploading] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [newItem, setNewItem] = useState('');
 
     // Form Data
     const [formData, setFormData] = useState<Partial<ExpenseReport>>({
@@ -35,6 +36,24 @@ export const ExpenseReportModal: React.FC<ExpenseReportModalProps> = ({ isOpen, 
         items: prefillItemNames || (prefillItemName ? [prefillItemName] : [])
     });
 
+    const handleAddItem = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (newItem.trim()) {
+            setFormData(prev => ({
+                ...prev,
+                items: [...(prev.items || []), newItem.trim()]
+            }));
+            setNewItem('');
+        }
+    };
+
+    const handleRemoveItem = (index: number) => {
+        setFormData(prev => ({
+            ...prev,
+            items: prev.items?.filter((_, i) => i !== index)
+        }));
+    };
+
     // Reset state when modal opens
     React.useEffect(() => {
         if (isOpen) {
@@ -43,6 +62,7 @@ export const ExpenseReportModal: React.FC<ExpenseReportModalProps> = ({ isOpen, 
             setPreviewUrl(null);
             setError(null);
             setIsAnalyzing(false);
+            setNewItem('');
             setFormData({
                 amountTTC: 0,
                 amountTVA: 0,
@@ -320,15 +340,48 @@ export const ExpenseReportModal: React.FC<ExpenseReportModalProps> = ({ isOpen, 
                             </div>
 
                             <div>
-                                <label className="block text-xs text-slate-400 mb-1">Articles détectés</label>
-                                <div className="bg-cinema-900 border border-cinema-700 rounded-lg p-3 min-h-[60px]">
+                                <label className="block text-xs text-slate-400 mb-1">Articles</label>
+                                <div className="bg-cinema-900 border border-cinema-700 rounded-lg p-3 min-h-[60px] space-y-3">
+                                    {/* Input Area */}
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={newItem}
+                                            onChange={(e) => setNewItem(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault(); // Prevent form submit
+                                                    handleAddItem(e);
+                                                }
+                                            }}
+                                            placeholder="Ajouter un article..."
+                                            className="flex-1 bg-cinema-800 border border-cinema-700 rounded px-2 py-1.5 text-sm text-white focus:border-eco-500 outline-none"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleAddItem}
+                                            disabled={!newItem.trim()}
+                                            className="bg-cinema-700 hover:bg-cinema-600 text-white px-3 py-1.5 rounded text-sm disabled:opacity-50"
+                                        >
+                                            Ajouter
+                                        </button>
+                                    </div>
+
+                                    {/* Items List */}
                                     {formData.items?.length === 0 ? (
-                                        <span className="text-slate-500 italic text-sm">Aucun article listé</span>
+                                        <span className="text-slate-500 italic text-sm block text-center py-2">Aucun article listé</span>
                                     ) : (
                                         <div className="flex flex-wrap gap-2">
                                             {formData.items?.map((item, idx) => (
-                                                <span key={idx} className="bg-cinema-700 text-slate-200 text-xs px-2 py-1 rounded-full border border-cinema-600">
+                                                <span key={idx} className="bg-cinema-700 text-slate-200 text-xs px-2 py-1 rounded-full border border-cinema-600 flex items-center gap-2 group">
                                                     {item}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveItem(idx)}
+                                                        className="text-slate-400 hover:text-red-400"
+                                                    >
+                                                        <X className="h-3 w-3" />
+                                                    </button>
                                                 </span>
                                             ))}
                                         </div>
