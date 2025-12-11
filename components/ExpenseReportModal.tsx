@@ -84,11 +84,8 @@ export const ExpenseReportModal: React.FC<ExpenseReportModalProps> = ({ isOpen, 
         setFormData(prev => {
             const newData = { ...prev, [field]: numValue };
 
-            // Logic: 
-            // 1. If we change HT, and TVA exists -> Update TTC.
-            // 2. If we change HT, and TTC exists but no TVA -> Update TVA.
-            // 3. If we change TTC -> Update TVA (assuming HT is fixed base or we deduce tax).
-            // 4. If we change TVA -> Update TTC (add tax to base).
+            // Logic: Calculate missing 3rd value based on 2 knowns
+            // TTC = HT + TVA
 
             const ht = field === 'amountHT' ? numValue : (prev.amountHT || 0);
             const ttc = field === 'amountTTC' ? numValue : (prev.amountTTC || 0);
@@ -96,17 +93,28 @@ export const ExpenseReportModal: React.FC<ExpenseReportModalProps> = ({ isOpen, 
 
             if (field === 'amountHT') {
                 if (tva > 0) {
+                    // HT + TVA -> TTC
                     newData.amountTTC = Number((ht + tva).toFixed(2));
                 } else if (ttc > 0) {
-                    newData.amountTVA = Number((ttc - ht).toFixed(2));
+                    // TTC - HT -> TVA
+                    newData.amountTVA = Number((Math.max(0, ttc - ht)).toFixed(2));
                 }
             } else if (field === 'amountTTC') {
-                // If we set Total, usually we deduce Tax from it based on HT, or just diff
-                // Ideally we keep HT stable. So TVA = TTC - HT.
-                newData.amountTVA = Number((ttc - ht).toFixed(2));
+                if (ht > 0) {
+                    // TTC - HT -> TVA
+                    newData.amountTVA = Number((Math.max(0, ttc - ht)).toFixed(2));
+                } else if (tva > 0) {
+                    // TTC - TVA -> HT
+                    newData.amountHT = Number((Math.max(0, ttc - tva)).toFixed(2));
+                }
             } else if (field === 'amountTVA') {
-                // If we set Tax, usually we add it to HT to get TTC
-                newData.amountTTC = Number((ht + numValue).toFixed(2));
+                if (ht > 0) {
+                    // HT + TVA -> TTC
+                    newData.amountTTC = Number((ht + numValue).toFixed(2));
+                } else if (ttc > 0) {
+                    // TTC - TVA -> HT
+                    newData.amountHT = Number((Math.max(0, ttc - numValue)).toFixed(2));
+                }
             }
 
             return newData;
