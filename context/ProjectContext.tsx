@@ -36,7 +36,7 @@ import {
   deleteDoc // Added
 } from 'firebase/firestore';
 
-import { getStorage, ref, deleteObject } from 'firebase/storage';
+import { getStorage, ref, deleteObject, uploadString, getDownloadURL } from 'firebase/storage';
 
 // Auth State Listener and Functions moved inside Provider
 
@@ -494,26 +494,95 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // --- Legacy Local State Actions (To be migrated) ---
 
-  const addBuyBackItem = (item: BuyBackItem) => {
-    setBuyBackItems(prev => [item, ...prev]);
-    addNotification(
-      `Nouvel article à vendre : ${item.name} (${item.price}€) par ${item.sellerDepartment}`,
-      'INFO',
-      'PRODUCTION'
-    );
+  // Sync BuyBack Items
+  useEffect(() => {
+    const projectId = project.id;
+    if (!projectId || projectId === 'default-project') return;
+
+    const itemsRef = collection(db, 'projects', projectId, 'buyBackItems');
+    const q = query(itemsRef, orderBy('date', 'desc'));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const items: BuyBackItem[] = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        items.push({ id: doc.id, ...data } as BuyBackItem);
+      });
+      setBuyBackItems(items);
+    }, (err) => {
+      console.error("[BuyBack] Sync Error:", err);
+    });
+
+    return () => unsubscribe();
+  }, [project.id]);
+
+  const addBuyBackItem = async (item: BuyBackItem) => {
+    try {
+      const projectId = project.id;
+      if (!projectId || projectId === 'default-project') {
+        setBuyBackItems(prev => [item, ...prev]);
+        return;
+      }
+
+      let photoUrl = item.photo;
+
+      // Handle Base64 Image Upload to Storage
+      if (item.photo && item.photo.startsWith('data:image')) {
+        try {
+          const storage = getStorage();
+          const storageRef = ref(storage, `projects/${projectId}/buyback/${Date.now()}_${Math.floor(Math.random() * 1000)}`);
+          await uploadString(storageRef, item.photo, 'data_url');
+          photoUrl = await getDownloadURL(storageRef);
+          console.log("[BuyBack] Image uploaded:", photoUrl);
+        } catch (uploadErr) {
+          console.error("[BuyBack] Image upload failed:", uploadErr);
+        }
+      }
+
+      const itemsRef = collection(db, 'projects', projectId, 'buyBackItems');
+      const { id, ...itemData } = item;
+
+      // Use the generated ID as doc ID
+      const docRef = doc(itemsRef, id);
+
+      await setDoc(docRef, {
+        ...itemData,
+        photo: photoUrl || null,
+        date: new Date().toISOString()
+      });
+
+      addNotification(
+        `Nouvel article à vendre : ${item.name} (${item.price}€) par ${item.sellerDepartment}`,
+        'INFO',
+        'PRODUCTION'
+      );
+    } catch (err: any) {
+      console.error("[BuyBack] Add Error:", err);
+      setError(`Erreur ajout vente: ${err.message}`);
+    }
   };
 
-  const toggleBuyBackReservation = (itemId: string, department: Department | 'PRODUCTION') => {
-    setBuyBackItems(prev => prev.map(item => {
-      if (item.id === itemId) {
-        if (item.reservedBy === department) {
-          return { ...item, reservedBy: null, status: 'AVAILABLE' };
-        }
-        if (item.reservedBy) return item;
-        return { ...item, reservedBy: department, status: 'RESERVED' };
-      }
-      return item;
-    }));
+  const toggleBuyBackReservation = async (itemId: string, department: Department | 'PRODUCTION') => {
+    const item = buyBackItems.find(i => i.id === itemId);
+    if (!item) return;
+
+    try {
+      const projectId = project.id;
+      const itemRef = doc(db, 'projects', projectId, 'buyBackItems', itemId);
+
+      const isReservedByMe = item.reservedBy === department;
+      const newStatus = isReservedByMe ? 'AVAILABLE' : 'RESERVED';
+      const newReservedBy = isReservedByMe ? null : department;
+
+      await updateDoc(itemRef, {
+        status: newStatus,
+        reservedBy: newReservedBy
+      });
+
+    } catch (err: any) {
+      console.error("[BuyBack] Reserve Error:", err);
+      setError(`Erreur réservation: ${err.message}`);
+    }
   };
 
   // Helper to generate consistent Project ID
