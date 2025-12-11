@@ -5,6 +5,7 @@ import { analyzeReceipt } from '../services/geminiService';
 import { ExpenseReport, ExpenseStatus } from '../types';
 import { storage } from '../services/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { compressImage } from '../utils/imageUtils';
 
 interface ExpenseReportModalProps {
     isOpen: boolean;
@@ -68,13 +69,25 @@ export const ExpenseReportModal: React.FC<ExpenseReportModalProps> = ({ isOpen, 
         const selectedFile = e.target.files?.[0];
         if (!selectedFile) return;
 
-        setFile(selectedFile);
-        setPreviewUrl(URL.createObjectURL(selectedFile));
-        setStep('ANALYZING');
+        // Compression for images
+        let fileToProcess = selectedFile;
+        // setStep('COMPRESSING'); // Could add a visible step, but keeping ANALYZING implies it
+        setStep('ANALYZING'); // Reuse analyzing state for visual simplicity or create a new one
         setError(null);
 
         try {
-            const result = await analyzeReceipt(selectedFile);
+            if (selectedFile.type.startsWith('image/')) {
+                try {
+                    fileToProcess = await compressImage(selectedFile);
+                } catch (e) {
+                    console.warn("Compression failed, using original", e);
+                }
+            }
+
+            setFile(fileToProcess);
+            setPreviewUrl(URL.createObjectURL(fileToProcess));
+
+            const result = await analyzeReceipt(fileToProcess);
             if (result.data) {
                 setFormData(prev => ({
                     ...prev,
