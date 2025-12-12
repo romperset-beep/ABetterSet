@@ -110,7 +110,16 @@ interface ProjectContextType {
 
   // Global Catalog
   catalogItems: CatalogItem[];
+  catalogItems: CatalogItem[];
   addToCatalog: (name: string, dept: string) => Promise<void>;
+
+  // Social Nav Control
+  socialAudience: 'GLOBAL' | 'DEPARTMENT' | 'USER';
+  setSocialAudience: (aud: 'GLOBAL' | 'DEPARTMENT' | 'USER') => void;
+  socialTargetDept: Department | 'PRODUCTION';
+  setSocialTargetDept: (dept: Department | 'PRODUCTION') => void;
+  socialTargetUserId: string;
+  setSocialTargetUserId: (id: string) => void;
 }
 
 const DEFAULT_PROJECT: Project = {
@@ -154,7 +163,14 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [debugStatus, setDebugStatus] = useState<string>("");
   const [lastLog, setLastLog] = useState<string>("En attente...");
 
-  // Auto-login replaced by onAuthStateChanged listener below
+  const [error, setError] = useState<string | null>(null);
+  const [debugStatus, setDebugStatus] = useState<string>("");
+  const [lastLog, setLastLog] = useState<string>("En attente...");
+
+  // Social View State (Lifted)
+  const [socialAudience, setSocialAudience] = useState<'GLOBAL' | 'DEPARTMENT' | 'USER'>('GLOBAL');
+  const [socialTargetDept, setSocialTargetDept] = useState<Department | 'PRODUCTION'>('PRODUCTION');
+  const [socialTargetUserId, setSocialTargetUserId] = useState<string>('');
 
   const resetPassword = async (email: string) => {
     try {
@@ -1353,7 +1369,12 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       error,
       testConnection,
       debugStatus,
-      lastLog
+      testConnection,
+      debugStatus,
+      lastLog,
+      socialAudience, setSocialAudience,
+      socialTargetDept, setSocialTargetDept,
+      socialTargetUserId, setSocialTargetUserId
     }}>
       {children}
     </ProjectContext.Provider>

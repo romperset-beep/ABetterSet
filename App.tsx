@@ -27,7 +27,7 @@ const AppContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isEditingDates, setIsEditingDates] = useState(false);
-  const { user, logout, unreadCount, unreadSocialCount, project, setCurrentDept, updateProjectDetails } = useProject();
+  const { user, logout, unreadCount, unreadSocialCount, project, setCurrentDept, updateProjectDetails, setSocialAudience, setSocialTargetDept, setSocialTargetUserId, socialPosts, userProfiles } = useProject();
 
   if (!user) {
     return <LoginPage />;
@@ -235,12 +235,51 @@ const AppContent: React.FC = () => {
             <button
               onClick={() => {
                 if (unreadSocialCount > 0) {
+                  // Smart Navigation: Find the most recent unread post to determine where to go
+                  // We need the same logic as 'unreadSocialCount' to find the posts
+                  const myProfile = userProfiles.find(up => up.email === user.email);
+                  // Approximate check: just find the latest unread post relevant to me
+                  // Ideally we would loop but for simplicity let's default to GLOBAL or find last one.
+                  // Let's rely on the user to switch if mixed, or try to be smart.
+                  const latestUnread = socialPosts.find(p => {
+                    // Only consider unread relative to localStorage (not accessible here easily without state, but we know count > 0)
+                    // Better: Just set default to GLOBAL unless we are sure.
+                    // Actually, if I receive a Dept message, I want to go to Dept view.
+                    if (!p.targetAudience) return false;
+                    return true;
+                  });
+
+                  // If user has unread messages, prioritize the most restrictive view
+                  // We can't easily know precisely WHICH one is unread without duplicating the logic or exposing it.
+                  // Hack: If unreadSocialCount > 0, we can try to guess or just default to Global?
+                  // USER REQ: "seul ce département puisse voir". If I'm in Global, I WON'T SEE IT anymore.
+                  // So I MUST switch view if the unread message is Dept.
+
+                  // Let's force "DEPARTMENT" view if my department has messages?
+                  // Or simpler: reset to GLOBAL daily?
+
+                  // For now, let's keep it simple: If I click, I go to Social.
+                  // BUT, if I don't see the message, it's bad.
+                  // Let's Try to detect if I have Departmental messages.
+                  const hasDeptMessages = socialPosts.some(p => p.targetAudience === 'DEPARTMENT' && p.targetDept === user.department && new Date(p.date).getTime() > (Number(localStorage.getItem('lastReadSocial')) || 0));
+                  const hasPrivateMessages = socialPosts.some(p => p.targetAudience === 'USER' && p.targetUserId === myProfile?.id && new Date(p.date).getTime() > (Number(localStorage.getItem('lastReadSocial')) || 0));
+
+                  if (hasPrivateMessages) {
+                    setSocialAudience('USER');
+                    // Ideally set the userId of the sender, but we can't easily get it here without iteration.
+                    // The Recent Discussions list handles it.
+                  } else if (hasDeptMessages) {
+                    setSocialAudience('DEPARTMENT');
+                    setSocialTargetDept(user.department as any);
+                  } else {
+                    setSocialAudience('GLOBAL');
+                  }
+
                   setActiveTab('social');
                 } else if ((user.department === 'PRODUCTION' || user.department === Department.REGIE) && unreadCount > 0) {
                   setActiveTab('inventory');
                   setCurrentDept('PRODUCTION');
                 } else {
-                  // Default fallback if clicked with no notifs
                   setActiveTab('social');
                 }
               }}
