@@ -142,6 +142,13 @@ export const TimesheetWidget: React.FC = () => {
         return Object.entries(weeks).sort((a, b) => b[0].localeCompare(a[0]));
     }, [activeLogs]);
 
+    // Help format hours decimal to HhMM
+    const formatHours = (decimalHours: number) => {
+        const hours = Math.floor(decimalHours);
+        const minutes = Math.round((decimalHours - hours) * 60);
+        return `${hours}h${minutes > 0 ? minutes.toString().padStart(2, '0') : ''}`;
+    };
+
     return (
         <div className="space-y-6 max-w-6xl mx-auto">
             {/* Header */}
@@ -295,7 +302,7 @@ export const TimesheetWidget: React.FC = () => {
                                 <div className="bg-cinema-900/50 px-4 py-2.5 rounded-lg border border-cinema-700 whitespace-nowrap">
                                     <span className="text-slate-500 text-xs font-bold uppercase mr-2">Total :</span>
                                     <span className="text-blue-400 font-bold">
-                                        {calculateHours(callTime, mealTime, endTime, hasShortenedMeal).toFixed(2)}h
+                                        {formatHours(calculateHours(callTime, mealTime, endTime, hasShortenedMeal))}
                                     </span>
                                 </div>
                             </div>
@@ -314,7 +321,7 @@ export const TimesheetWidget: React.FC = () => {
                                     </div>
                                     <div className="text-right">
                                         <div className="text-xs text-slate-500 uppercase font-bold">Total Hebdo</div>
-                                        <div className="text-2xl font-black text-slate-900 leading-none">{data.totalHours.toFixed(2)} <span className="text-sm font-normal text-slate-500">heures</span></div>
+                                        <div className="text-2xl font-black text-slate-900 leading-none">{formatHours(data.totalHours)}</div>
                                     </div>
                                 </div>
 
@@ -344,7 +351,7 @@ export const TimesheetWidget: React.FC = () => {
                                                         {log.hasShortenedMeal ? '30 min' : '1h 00'}
                                                     </td>
                                                     <td className="px-6 py-4 text-slate-600 font-mono">{log.endTime}</td>
-                                                    <td className="px-6 py-4 text-right font-bold text-slate-800 bg-slate-50/50">{log.totalHours.toFixed(2)}</td>
+                                                    <td className="px-6 py-4 text-right font-bold text-slate-800 bg-slate-50/50">{formatHours(log.totalHours)}</td>
                                                     <td className="px-6 py-4 text-center">
                                                         {/* Only allow delete in Personal Mode, or maybe Admin? Let's restrict to Personal for now */}
                                                         {viewMode === 'personal' && (
@@ -363,7 +370,7 @@ export const TimesheetWidget: React.FC = () => {
                                     <tfoot className="bg-slate-50 border-t border-slate-200">
                                         <tr>
                                             <td colSpan={5} className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase">Total Semaine</td>
-                                            <td className="px-6 py-3 text-right font-black text-slate-900 border-l border-slate-200">{data.totalHours.toFixed(2)}</td>
+                                            <td className="px-6 py-3 text-right font-black text-slate-900 border-l border-slate-200">{formatHours(data.totalHours)}</td>
                                             <td></td>
                                         </tr>
                                     </tfoot>
