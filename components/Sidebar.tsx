@@ -53,8 +53,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, onCl
       title: 'Quotidien',
       items: [
         { id: 'callsheets', label: 'Feuilles de Service', icon: FileText },
-        { id: 'catering', label: 'Feuille Cantine', icon: Utensils, allowedDepts: ['REGIE', 'PRODUCTION'] },
         { id: 'timesheet', label: 'Les Heures', icon: Clock, allowedDepts: 'ALL' },
+        { id: 'catering', label: 'Feuille Cantine', icon: Utensils, allowedDepts: ['REGIE', 'PRODUCTION'] },
         { id: 'expenses', label: t('sidebar.expenses'), icon: Euro },
       ]
     },
@@ -151,8 +151,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, onCl
                           if (onClose) onClose();
                         }}
                         className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 text-sm font-medium ${isActive
-                            ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
-                            : 'text-slate-400 hover:bg-slate-800 hover:text-white border border-transparent'
+                          ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
+                          : 'text-slate-400 hover:bg-slate-800 hover:text-white border border-transparent'
                           }`}
                       >
                         <Icon size={18} />

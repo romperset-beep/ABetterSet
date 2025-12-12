@@ -1,6 +1,6 @@
 import React from 'react';
 import { Department, SurplusAction } from '../types';
-import { Users, RefreshCw, GraduationCap, ShoppingBag, MessageSquare, Film, Calendar, FileText, Receipt, Utensils } from 'lucide-react';
+import { Users, RefreshCw, GraduationCap, ShoppingBag, MessageSquare, Film, Calendar, FileText, Receipt, Utensils, Clock } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 
 interface ProjectManagerProps {
@@ -156,6 +156,54 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({
                         {unreadSocialCount}
                     </p>
                     <p className="text-xs text-slate-400 mt-1">Nouveaux messages</p>
+                </button>
+
+                {/* 7. Les Heures (NEW) */}
+                <button
+                    onClick={() => setActiveTab && setActiveTab('timesheet')}
+                    className="bg-cinema-800 p-6 rounded-xl text-white shadow-lg border border-cinema-700 text-left hover:bg-cinema-700 transition-colors group"
+                >
+                    <div className="flex justify-between items-start">
+                        <h3 className="text-lg font-semibold opacity-70">Les Heures</h3>
+                        <Clock className="h-6 w-6 text-blue-400 group-hover:scale-110 transition-transform" />
+                    </div>
+                    {/* Calculate current week hours */}
+                    <div className="mt-2">
+                        {(() => {
+                            const now = new Date();
+                            // Logic duplicated from TimesheetWidget to get current week total quickly
+                            // A better way would be to expose this via context but let's keep it self-contained for now
+                            // Actually, calculating proper week ranges is complex. Let's just sum all recent logs for now?
+                            // Or better: Filter logs for current ISO week.
+
+                            const getWeekNumber = (d: Date) => {
+                                d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+                                d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+                                const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+                                const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+                                return { week: weekNo, year: d.getUTCFullYear() };
+                            };
+
+                            const currentWeek = getWeekNumber(now);
+                            const currentWeekLogs = project.timeLogs?.filter(l => {
+                                if (l.userId !== user?.email) return false;
+                                const logDate = new Date(l.date);
+                                const logWeek = getWeekNumber(logDate);
+                                return logWeek.week === currentWeek.week && logWeek.year === currentWeek.year;
+                            }) || [];
+
+                            const total = currentWeekLogs.reduce((acc, l) => acc + l.totalHours, 0);
+
+                            // HhMM formatter (duplicated)
+                            const hours = Math.floor(total);
+                            const minutes = Math.round((total - hours) * 60);
+                            const formatted = `${hours}h${minutes > 0 ? minutes.toString().padStart(2, '0') : ''}`;
+
+                            return <p className="text-4xl font-bold text-blue-400">{formatted}</p>;
+                        })()}
+                    </div>
+
+                    <p className="text-xs text-slate-400 mt-1">Total Semaine en cours</p>
                 </button>
 
             </div>
