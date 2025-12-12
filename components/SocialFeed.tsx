@@ -271,7 +271,18 @@ export const SocialFeed: React.FC = () => {
         if (!allowed) return false;
 
         if (targetAudience === 'GLOBAL') {
-            return !post.targetAudience || post.targetAudience === 'GLOBAL';
+            // Show Global posts
+            if (!post.targetAudience || post.targetAudience === 'GLOBAL') return true;
+
+            // Show posts targeted to MY department
+            if (post.targetAudience === 'DEPARTMENT' && post.targetDept === user?.department) return true;
+
+            // Show posts I SENT to any department (so I can see what I posted)
+            const myProfile = userProfiles.find(p => p.email === user?.email);
+            const isMe = post.authorId === myProfile?.id || (!post.authorId && post.authorName === user?.name);
+            if (post.targetAudience === 'DEPARTMENT' && isMe) return true;
+
+            return false;
         }
 
         if (targetAudience === 'DEPARTMENT') {
