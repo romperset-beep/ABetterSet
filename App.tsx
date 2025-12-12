@@ -4,6 +4,7 @@ import { ProjectManager } from './components/ProjectManager';
 import { InventoryManager } from './components/InventoryManager';
 import { CateringWidget } from './components/CateringWidget';
 import { TimesheetWidget } from './components/TimesheetWidget';
+import { MemoWidget } from './components/MemoWidget';
 import { CircularEconomy } from './components/CircularEconomy';
 import { ImpactReport } from './components/ImpactReport';
 import { GlobalStock } from './components/GlobalStock';
@@ -84,6 +85,8 @@ const AppContent: React.FC = () => {
         return <CateringWidget />;
       case 'timesheet':
         return <TimesheetWidget />;
+      case 'memo':
+        return <MemoWidget setActiveTab={setActiveTab} />;
       case 'callsheets':
         return <CallSheetView />;
       case 'admin':

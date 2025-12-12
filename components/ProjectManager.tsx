@@ -156,88 +156,20 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({
                     <p className="text-xs text-slate-400 mt-1">Total Semaine en cours</p>
                 </button>
 
-                {/* 4. Memos Widget (NEW) */}
-                <div className="bg-cinema-800 p-6 rounded-xl text-white shadow-lg border border-cinema-700 md:col-span-2 relative">
-                    <div className="flex justify-between items-start mb-4">
-                        <h3 className="text-lg font-semibold opacity-70 flex items-center gap-2">
-                            <MessageSquare className="h-5 w-5 text-pink-500" />
-                            Mémos Rapides
-                        </h3>
-                        <select
-                            value={memoTarget}
-                            onChange={(e) => setMemoTarget(e.target.value as any)}
-                            className="bg-cinema-900 border border-cinema-600 text-xs rounded px-2 py-1 text-slate-300 focus:outline-none focus:border-pink-500"
-                        >
-                            <option value="DEPARTMENT">Un Département</option>
-                            <option value="GLOBAL">Tout le monde</option>
-                            <option value="USER">Une personne</option>
-                        </select>
+                {/* 4. Memo Rapide (Shortcut) */}
+                <button
+                    onClick={() => setActiveTab && setActiveTab('memo')}
+                    className="bg-cinema-800 p-6 rounded-xl text-white shadow-lg border border-cinema-700 text-left hover:bg-cinema-700 transition-colors group"
+                >
+                    <div className="flex justify-between items-start">
+                        <h3 className="text-lg font-semibold opacity-70">Mémo Rapide</h3>
+                        <MessageSquare className="h-6 w-6 text-pink-500 group-hover:scale-110 transition-transform" />
                     </div>
-
-                    <form onSubmit={handleSendMemo} className="space-y-3">
-                        {/* Secondary Target Selector */}
-                        {memoTarget === 'DEPARTMENT' && user?.department === 'PRODUCTION' && (
-                            <select
-                                value={memoTargetDept}
-                                onChange={(e) => setMemoTargetDept(e.target.value as any)}
-                                className="w-full bg-cinema-900 border border-cinema-600 rounded px-3 py-2 text-sm text-white mb-2"
-                            >
-                                {Object.values(Department).map(d => <option key={d} value={d}>{d}</option>)}
-                                <option value="PRODUCTION">PRODUCTION</option>
-                            </select>
-                        )}
-
-                        {memoTarget === 'USER' && (
-                            <div className="relative">
-                                <input
-                                    type="text"
-                                    placeholder="Rechercher..."
-                                    value={memoSearchTerm}
-                                    onChange={(e) => {
-                                        setMemoSearchTerm(e.target.value);
-                                        setShowMemoSuggestions(true);
-                                    }}
-                                    onFocus={() => setShowMemoSuggestions(true)}
-                                    className="w-full bg-cinema-900 border border-cinema-600 rounded px-3 py-2 text-sm text-white"
-                                />
-                                {showMemoSuggestions && memoSearchTerm && (
-                                    <div className="absolute top-full left-0 w-full bg-cinema-800 border border-cinema-600 rounded-b-lg shadow-xl z-50 max-h-40 overflow-y-auto">
-                                        {userProfiles
-                                            .filter(u => `${u.firstName} ${u.lastName}`.toLowerCase().includes(memoSearchTerm.toLowerCase()))
-                                            .map(u => (
-                                                <div
-                                                    key={u.id}
-                                                    onClick={() => {
-                                                        setMemoTargetUserId(u.id);
-                                                        setMemoSearchTerm(`${u.firstName} ${u.lastName}`);
-                                                        setShowMemoSuggestions(false);
-                                                    }}
-                                                    className="px-3 py-2 hover:bg-cinema-700 cursor-pointer text-sm"
-                                                >
-                                                    {u.firstName} {u.lastName}
-                                                </div>
-                                            ))
-                                        }
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        <textarea
-                            value={memoContent}
-                            onChange={(e) => setMemoContent(e.target.value)}
-                            placeholder="Écrivez votre mémo ici..."
-                            className="w-full bg-cinema-900 border border-cinema-600 rounded-lg p-3 text-sm text-white resize-none h-24 focus:ring-1 focus:ring-pink-500 outline-none"
-                        />
-                        <button
-                            type="submit"
-                            disabled={!memoContent.trim()}
-                            className="w-full bg-pink-600 hover:bg-pink-500 text-white font-bold py-2 rounded-lg text-sm transition-colors disabled:opacity-50"
-                        >
-                            Envoyer
-                        </button>
-                    </form>
-                </div>
+                    <p className="text-4xl font-bold mt-2 text-pink-500">
+                        →
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">Envoyer un message</p>
+                </button>
 
                 {/* 5. Catering Card (Régie & Prod) */}
                 {(currentDept === 'Régie' || currentDept === 'PRODUCTION') && (
