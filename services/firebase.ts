@@ -3,6 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore, setLogLevel } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getAuth } from 'firebase/auth';
+import { getAnalytics, isSupported } from 'firebase/analytics';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -23,3 +24,6 @@ setLogLevel('debug');
 export const db = getFirestore(app, 'cinestock-db');
 export const auth = getAuth(app);
 export const storage = getStorage(app);
+
+// Initialize Analytics conditionally (client-side only)
+export const analytics = isSupported().then(yes => yes ? getAnalytics(app) : null);
