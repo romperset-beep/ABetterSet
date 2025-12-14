@@ -70,6 +70,14 @@ export interface Project {
   cateringLogs?: CateringLog[];
   cateringValidations?: Record<string, boolean>; // date -> isValidated
   timeLogs?: TimeLog[];
+  reinforcements?: Reinforcement[];
+}
+
+export interface Reinforcement {
+  id: string; // date_dept_index or similar
+  date: string; // YYYY-MM-DD
+  department: Department | 'PRODUCTION';
+  names: string[]; // List of names
 }
 
 export interface CateringLog {

@@ -156,6 +156,50 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({
                     <p className="text-xs text-slate-400 mt-1">Total Semaine en cours</p>
                 </button>
 
+                {/* 3.5 Renforts */}
+                <button
+                    onClick={() => setActiveTab && setActiveTab('renforts')}
+                    className="bg-cinema-800 p-6 rounded-xl text-white shadow-lg border border-cinema-700 text-left hover:bg-cinema-700 transition-colors group"
+                >
+                    <div className="flex justify-between items-start">
+                        <h3 className="text-lg font-semibold opacity-70">Renforts</h3>
+                        <Users className="h-6 w-6 text-indigo-400 group-hover:scale-110 transition-transform" />
+                    </div>
+                    {/* Calculate Renforts for current week */}
+                    <div className="mt-2 text-4xl font-bold text-indigo-400">
+                        {(() => {
+                            // Count total reinforcements for current week
+                            // Simple approximation: count items with date in recent range?
+                            // Or just show total reinforcement days?
+                            // Let's count individual NAMES for this week.
+                            const now = new Date();
+                            const getWeekNumber = (d: Date) => {
+                                d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+                                d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+                                const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+                                const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+                                return { week: weekNo, year: d.getUTCFullYear() };
+                            };
+                            const currentWeek = getWeekNumber(now);
+
+                            // Flatten all reinforcements
+                            let count = 0;
+                            (project.reinforcements || []).forEach(r => {
+                                const rDate = new Date(r.date);
+                                const rWeek = getWeekNumber(rDate);
+                                if (rWeek.week === currentWeek.week && rWeek.year === currentWeek.year) {
+                                    // For Dept: Only count MY dept? For Prod: Count ALL?
+                                    if (currentDept === 'PRODUCTION' || r.department === currentDept) {
+                                        count += r.names.length;
+                                    }
+                                }
+                            });
+                            return count;
+                        })()}
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">Renforts cette semaine</p>
+                </button>
+
                 {/* 4. Memo Rapide (Shortcut) */}
                 <button
                     onClick={() => setActiveTab && setActiveTab('memo')}
