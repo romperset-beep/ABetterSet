@@ -123,6 +123,15 @@ export interface TimeLog {
   callTime: string; // HH:mm
   mealTime: string; // HH:mm (Start of meal)
   hasShortenedMeal: boolean; // If true, deduct 30m instead of 1h
+  isContinuousDay?: boolean; // Added: Journée Continue (20 mins paid break included, usually)
+  breakDuration?: number; // Added: Pause in minutes (manual override)
+  note?: string; // Added: User manual note
+
+  // Detailed User Info for Export
+  userFirstName?: string;
+  userLastName?: string;
+  userRole?: string; // Fonction
+
   endTime: string; // HH:mm
   totalHours: number; // Calculated hours
 }

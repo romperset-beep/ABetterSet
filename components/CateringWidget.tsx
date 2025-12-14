@@ -178,7 +178,134 @@ export const CateringWidget: React.FC = () => {
         });
 
         return { total, veggie, byDept };
+        return { total, veggie, byDept };
     }, [dailyLogs]);
+
+    // CSV Export Logic
+    const downloadCSV = (data: any[], filename: string, isWeeklyLog = false) => {
+        const headers = ['Date', 'Nom', 'Département', 'Fonction', 'Régime', 'A Mangé', 'Végétarien'];
+
+        const rows = data.map(row => {
+            // Normalize data source (Table Row vs Raw Log)
+            let date, name, dept, role, diet, hasEaten, isVeg;
+
+            if (isWeeklyLog) {
+                // Raw Log (Weekly)
+                const log = row as CateringLog;
+                date = log.date;
+                name = log.guestName || (log.userId ? userProfiles.find(u => u.email === log.userId)?.firstName + ' ' + userProfiles.find(u => u.email === log.userId)?.lastName : 'Inconnu');
+                dept = log.department;
+                // Lookup role if user
+                const profile = log.userId ? userProfiles.find(u => u.email === log.userId) : null;
+                role = profile?.role || (log.isManual ? 'Invité' : '');
+                diet = profile?.dietaryHabits || (log.isVegetarian ? 'Végétarien' : 'Standard');
+                hasEaten = log.hasEaten ? 'OUI' : 'NON';
+                isVeg = log.isVegetarian ? 'OUI' : 'NON';
+            } else {
+                // Table Row (Daily)
+                date = selectedDate;
+                name = row.name;
+                dept = row.department;
+                role = row.role || '';
+                diet = row.diet;
+                hasEaten = row.hasEaten ? 'OUI' : 'NON';
+                isVeg = row.isVegetarian ? 'OUI' : 'NON';
+            }
+
+            return [date, `"${name}"`, dept, `"${role}"`, diet, hasEaten, isVeg];
+        });
+
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(r => r.join(','))
+        ].join('\n');
+
+        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `${filename}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    };
+
+    // Structured Weekly Report
+    const downloadWeeklyReport = (weekKey: string, logsForWeek: any[]) => {
+        // 1. Group by Date
+        const logsByDate: Record<string, any[]> = {};
+        logsForWeek.forEach(log => {
+            if (!logsByDate[log.date]) logsByDate[log.date] = [];
+            logsByDate[log.date].push(log);
+        });
+
+        // 2. Sort Dates (ISO strings sort correctly)
+        const sortedDates = Object.keys(logsByDate).sort();
+        if (sortedDates.length === 0) return alert("Aucune donnée pour cette semaine.");
+
+        const startDate = sortedDates[0];
+        const endDate = sortedDates[sortedDates.length - 1];
+        const weeklyTotal = logsForWeek.length;
+        const weeklyVeggie = logsForWeek.filter(l => l.isVegetarian).length;
+
+        // 3. Build CSV Content
+        let csv = `RAPPORT CANTINE - SEMAINE DU ${startDate.split('-').reverse().join('/')} AU ${endDate.split('-').reverse().join('/')}\n`;
+        csv += `TOTAL SEMAINE: ${weeklyTotal} repas (Dont Végé: ${weeklyVeggie})\n\n`;
+
+        // Columns Header
+        const cols = "Date,Nom,Département,Fonction,Régime,A Mangé,Végétarien";
+
+        // Iterate Days
+        sortedDates.forEach(date => {
+            const dayLogs = logsByDate[date];
+            const dayTotal = dayLogs.length;
+            const dayVeggie = dayLogs.filter(l => l.isVegetarian).length;
+
+            // Sort by Dept then Name
+            dayLogs.sort((a, b) => {
+                if (a.department !== b.department) return a.department.localeCompare(b.department);
+                const nameA = a.guestName || (a.userId ? userProfiles.find(u => u.email === a.userId)?.lastName : '') || '';
+                const nameB = b.guestName || (b.userId ? userProfiles.find(u => u.email === b.userId)?.lastName : '') || '';
+                return nameA.localeCompare(nameB);
+            });
+
+            // Day Header
+            csv += `JOURNÉE DU ${date.split('-').reverse().join('/')} (Total: ${dayTotal} - Végé: ${dayVeggie})\n`;
+            csv += `${cols}\n`;
+
+            // Rows
+            dayLogs.forEach(log => {
+                // Resolve details
+                const profile = log.userId ? userProfiles.find(u => u.email === log.userId) : null;
+                const name = log.guestName || (profile ? `${profile.firstName} ${profile.lastName}` : 'Inconnu');
+                const dept = log.department;
+                const role = profile?.role || (log.isManual ? 'Invité' : '');
+                const diet = profile?.dietaryHabits || (log.isVegetarian ? 'Végétarien' : 'Standard');
+                const hasEaten = log.hasEaten ? 'OUI' : 'NON';
+                const isVeg = log.isVegetarian ? 'OUI' : 'NON';
+
+                csv += `${date},"${name}",${dept},"${role}",${diet},${hasEaten},${isVeg}\n`;
+            });
+
+            csv += `\n`; // Spacer between days
+        });
+
+        // Download
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `Rapport_Cantine_Semaine_${weekKey}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -207,9 +334,21 @@ export const CateringWidget: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-6">
-                    {/* View Toggle for Production */}
-                    {isProduction && (
+                    {/* View Toggle for Production & Régie */}
+                    {isRegie && (
                         <div className="bg-cinema-900 rounded-lg p-1 flex gap-1 border border-cinema-700">
+                            {/* Export BUTTON for Daily View */}
+                            {viewMode === 'daily' && (
+                                <button
+                                    onClick={() => downloadCSV(tableData, `Cantine_Jour_${selectedDate}`)}
+                                    className="px-3 py-1.5 rounded-md text-sm font-medium text-eco-400 hover:text-eco-300 flex items-center gap-1 border-r border-cinema-700 pr-2 mr-2"
+                                    title="Exporter la journée"
+                                >
+                                    <Download className="h-4 w-4" />
+                                    <span className="hidden lg:inline">Export Jour</span>
+                                </button>
+                            )}
+
                             <button
                                 onClick={() => setViewMode('daily')}
                                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === 'daily' ? 'bg-cinema-700 text-white shadow' : 'text-slate-400 hover:text-white'}`}
@@ -300,15 +439,33 @@ export const CateringWidget: React.FC = () => {
                                         <span className="text-xl font-bold text-eco-400">{week.veggie}</span>
                                     </td>
                                     <td className="px-6 py-4 text-center">
-                                        <button
-                                            onClick={() => {
-                                                setSelectedDate(week.firstDate);
-                                                setViewMode('daily');
-                                            }}
-                                            className="text-blue-400 hover:text-blue-300 text-sm font-bold hover:underline"
-                                        >
-                                            Voir Détail
-                                        </button>
+                                        <div className="flex justify-center gap-4">
+                                            <button
+                                                onClick={() => {
+                                                    // Filter logs for this week
+                                                    const logsForWeek = (project.cateringLogs || []).filter(l => {
+                                                        if (!l.hasEaten) return false; // Only export EATEN meals for the report? User said "Feuilles Cantine", implies list of meals.
+                                                        const d = new Date(l.date);
+                                                        const { week: w, year: y } = getWeekNumber(d);
+                                                        return `${y}-${w}` === week.key;
+                                                    });
+                                                    downloadWeeklyReport(week.key, logsForWeek);
+                                                }}
+                                                className="text-eco-400 hover:text-eco-300 text-sm font-bold flex items-center gap-1 hover:underline"
+                                            >
+                                                <Download className="h-4 w-4" />
+                                                CSV
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedDate(week.firstDate);
+                                                    setViewMode('daily');
+                                                }}
+                                                className="text-blue-400 hover:text-blue-300 text-sm font-bold hover:underline"
+                                            >
+                                                Voir Détail
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             )) : (
@@ -346,57 +503,66 @@ export const CateringWidget: React.FC = () => {
                             <table className="w-full">
                                 <thead>
                                     <tr className="bg-cinema-900/50 border-b border-cinema-700 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">
-                                        <th className="px-6 py-4">Nom</th>
-                                        <th className="px-6 py-4">Département & Fonction</th>
-                                        <th className="px-6 py-4">Régime</th>
-                                        <th className="px-6 py-4 text-center">A Mangé ?</th>
-                                        <th className="px-6 py-4 text-center">Végétarien ?</th>
+                                        <th className="px-2 py-3 md:px-6 md:py-4">Nom</th>
+                                        <th className="px-2 py-3 md:px-6 md:py-4">
+                                            <span className="md:hidden">Dpt</span>
+                                            <span className="hidden md:inline">Département & Fonction</span>
+                                        </th>
+                                        <th className="px-2 py-3 md:px-6 md:py-4">Régime</th>
+                                        <th className="px-2 py-3 md:px-6 md:py-4 text-center">
+                                            <span className="md:hidden">Manger</span>
+                                            <span className="hidden md:inline">A Mangé ?</span>
+                                        </th>
+                                        <th className="px-2 py-3 md:px-6 md:py-4 text-center">
+                                            <span className="md:hidden">Végé</span>
+                                            <span className="hidden md:inline">Végétarien ?</span>
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-cinema-700">
                                     {tableData.map((row) => (
                                         <tr key={row.id} className="hover:bg-cinema-700/30 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <div className="font-bold text-white flex items-center gap-2">
-                                                    {row.name}
-                                                    {row.isManual && <span className="text-[10px] bg-blue-900/50 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/30">INVITÉ</span>}
+                                            <td className="px-2 py-3 md:px-6 md:py-4">
+                                                <div className="font-bold text-white flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
+                                                    <span className="truncate max-w-[100px] md:max-w-none">{row.name}</span>
+                                                    {row.isManual && <span className="text-[8px] md:text-[10px] bg-blue-900/50 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/30 inline-block w-fit">INVITÉ</span>}
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4">
-                                                <div className="text-sm text-white">{row.department}</div>
-                                                <div className="text-xs text-slate-500">{row.role}</div>
+                                            <td className="px-2 py-3 md:px-6 md:py-4">
+                                                <div className="text-xs md:text-sm text-white truncate max-w-[80px] md:max-w-none">{row.department}</div>
+                                                <div className="text-[10px] md:text-xs text-slate-500 truncate max-w-[80px] md:max-w-none hidden sm:block">{row.role}</div>
                                             </td>
-                                            <td className="px-6 py-4">
+                                            <td className="px-2 py-3 md:px-6 md:py-4">
                                                 {row.diet !== 'Standard' ? (
-                                                    <span className="text-xs font-bold bg-purple-900/50 text-purple-400 px-2 py-1 rounded border border-purple-500/30">
-                                                        {row.diet}
+                                                    <span className="text-[10px] md:text-xs font-bold bg-purple-900/50 text-purple-400 px-1.5 py-0.5 md:px-2 md:py-1 rounded border border-purple-500/30 whitespace-nowrap">
+                                                        {row.diet === 'Végétarien' ? 'Végé' : row.diet}
                                                     </span>
                                                 ) : (
-                                                    <span className="text-xs text-slate-600">Standard</span>
+                                                    <span className="text-[10px] md:text-xs text-slate-600">Std</span>
                                                 )}
                                             </td>
-                                            <td className="px-6 py-4 text-center">
+                                            <td className="px-2 py-3 md:px-6 md:py-4 text-center">
                                                 <button
                                                     onClick={() => handleToggleMeal(row, 'hasEaten')}
                                                     disabled={!isRegie}
-                                                    className={`p-2 rounded-lg transition-all ${row.hasEaten
-                                                        ? 'bg-green-600 text-white shadow-lg shadow-green-600/20 scale-110'
+                                                    className={`p-1.5 md:p-2 rounded-lg transition-all ${row.hasEaten
+                                                        ? 'bg-green-600 text-white shadow-lg shadow-green-600/20 md:scale-110'
                                                         : 'bg-cinema-900 text-slate-600 hover:bg-cinema-700'
                                                         } ${!isRegie && 'opacity-50 cursor-not-allowed'}`}
                                                 >
-                                                    <Check className="h-5 w-5" />
+                                                    <Check className="h-4 w-4 md:h-5 md:w-5" />
                                                 </button>
                                             </td>
-                                            <td className="px-6 py-4 text-center">
+                                            <td className="px-2 py-3 md:px-6 md:py-4 text-center">
                                                 <button
                                                     onClick={() => handleToggleMeal(row, 'isVegetarian')}
                                                     disabled={!isRegie}
-                                                    className={`p-2 rounded-lg transition-all ${row.isVegetarian
+                                                    className={`p-1.5 md:p-2 rounded-lg transition-all ${row.isVegetarian
                                                         ? 'bg-eco-600 text-white shadow-lg shadow-eco-600/20'
                                                         : 'bg-cinema-900 text-slate-600 hover:bg-cinema-700'
                                                         } ${!isRegie && 'opacity-50 cursor-not-allowed'}`}
                                                 >
-                                                    <Leaf className="h-5 w-5" />
+                                                    <Leaf className="h-4 w-4 md:h-5 md:w-5" />
                                                 </button>
                                             </td>
                                         </tr>
