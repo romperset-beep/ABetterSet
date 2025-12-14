@@ -52,7 +52,11 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <GlobalErrorBoundary>
-      <App />
+      {/* <App /> */}
+      <div style={{ color: 'white', padding: 50, fontSize: 30 }}>
+        <h1>NUCLEAR TEST: RENDER IS WORKING</h1>
+        <p>If you see this, App.tsx is the problem.</p>
+      </div>
     </GlobalErrorBoundary>
   </React.StrictMode>
 );
