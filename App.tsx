@@ -53,21 +53,9 @@ const AppContent: React.FC = () => {
   // The selection screen itself will handle "Welcome Back" vs "New Form" logic
   const needsProjectSelection = project.id === 'default-project' || !project.id;
 
-  // DEBUG OVERLAY
-  const debugOverlay = (
-    <div style={{ position: 'fixed', top: 0, left: 0, zIndex: 99999, background: 'rgba(0,0,0,0.8)', color: '#0f0', padding: '10px', fontSize: '12px', pointerEvents: 'none' }}>
-      <p>DEBUG HUD</p>
-      <p>User: {user ? user.email : 'NULL'}</p>
-      <p>Project ID: {project.id}</p>
-      <p>Needs Selection: {needsProjectSelection ? 'YES' : 'NO'}</p>
-      <p>Window InnerHeight: {window.innerHeight}</p>
-    </div>
-  );
-
   if (needsProjectSelection) {
     return (
       <div className="min-h-screen bg-cinema-900 flex items-center justify-center p-4 relative overflow-hidden">
-        {debugOverlay}
         {/* Reuse background from Login for consistency */}
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
           <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-eco-500/10 rounded-full blur-[100px]"></div>
