@@ -293,7 +293,7 @@ const AppContent: React.FC = () => {
                 } else if (unreadCount > 0) {
                   // Inventory
                   setActiveTab('inventory');
-                  if (user.department === 'PRODUCTION' || user.department === 'Régie' || user.department === 'REGIE') {
+                  if (user.department === 'PRODUCTION' || user.department === Department.REGIE) {
                     setCurrentDept('PRODUCTION'); // Overview
                   } else {
                     setCurrentDept(user.department);

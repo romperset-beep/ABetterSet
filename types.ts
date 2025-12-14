@@ -206,7 +206,7 @@ export interface SocialPost {
   date: string; // ISO Date
   likes: number;
   targetAudience?: 'GLOBAL' | 'DEPARTMENT' | 'USER'; // Added
-  targetDept?: Department | 'PRODUCTION'; // Added
+  targetDept?: Department | 'PRODUCTION' | 'GLOBAL'; // Added
   targetUserId?: string; // Added
 }
 

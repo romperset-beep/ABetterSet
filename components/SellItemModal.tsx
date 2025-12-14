@@ -41,7 +41,7 @@ export const SellItemModal: React.FC<SellItemModalProps> = ({ isOpen, onClose })
             originalPrice: originalPrice ? parseFloat(originalPrice) : undefined,
             description,
             photo: photo || undefined,
-            sellerDepartment: user?.department || currentDept || 'PRODUCTION', // Fallback
+            sellerDepartment: (user?.department || currentDept || 'PRODUCTION') as Department | 'PRODUCTION', // Fallback
             reservedBy: null,
             status: 'AVAILABLE',
             date: new Date().toISOString()
