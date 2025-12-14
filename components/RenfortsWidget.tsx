@@ -9,9 +9,11 @@ export const RenfortsWidget: React.FC = () => {
 
     React.useEffect(() => {
         if (user?.department === 'PRODUCTION' || user?.department === Department.REGIE) {
-            const unreadRenforts = notifications.filter(n => !n.read && (n.message.toLowerCase().includes('renfort') || n.targetDept === 'PRODUCTION'));
-            if (unreadRenforts.length > 0) {
-                unreadRenforts.forEach(n => markAsRead(n.id));
+            // Broaden to clear ALL unread notifications for this user context, 
+            // since the Bell redirects here for any generic notification.
+            const unread = notifications.filter(n => !n.read && (n.targetDept === 'PRODUCTION' || n.targetDept === user.department));
+            if (unread.length > 0) {
+                unread.forEach(n => markAsRead(n.id));
             }
         }
     }, [user, notifications, markAsRead]);
