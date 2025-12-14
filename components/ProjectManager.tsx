@@ -226,7 +226,7 @@ interface ProjectManagerProps {
 export const ProjectManager: React.FC<ProjectManagerProps> = ({
     setActiveTab,
 }) => {
-    const { currentDept, setCurrentDept, user, t, updateUser } = useProject();
+    const { currentDept, setCurrentDept, user, t } = useProject();
 
     // --- Dashboard Order Logic ---
     const allWidgets = [

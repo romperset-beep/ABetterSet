@@ -68,7 +68,6 @@ interface ProjectContextType {
   deleteProject: (projectId: string) => Promise<void>;
   removeProjectFromHistory: (projectId: string) => Promise<void>; // Added
 
-  updateUser: (updates: Partial<User>) => void; // Added for persistence
   logout: () => void;
 
   // Notifications
@@ -952,12 +951,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
-  const updateUser = (updates: Partial<User>) => {
-    if (!user) return;
-    const updatedUser = { ...user, ...updates };
-    setUser(updatedUser);
-    localStorage.setItem('aBetterSetUser', JSON.stringify(updatedUser)); // Persist locally
-  };
+
 
   const logout = async () => {
     await signOut(auth);
@@ -1416,8 +1410,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       lastLog,
       socialAudience, setSocialAudience,
       socialTargetDept, setSocialTargetDept,
-      socialTargetUserId, setSocialTargetUserId,
-      updateUser, // Added
+      socialTargetUserId, setSocialTargetUserId
     }}>
     </ProjectContext.Provider >
   );
