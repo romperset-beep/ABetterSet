@@ -20,6 +20,7 @@ export const RenfortsWidget: React.FC = () => {
     const [prodSelectedWeek, setProdSelectedWeek] = useState<string | null>(null); // 'YYYY-Wxx'
     const [prodExpandedDays, setProdExpandedDays] = useState<string[]>([]); // Date Strings
     const [prodExpandedDepts, setProdExpandedDepts] = useState<string[]>([]); // 'YYYY-MM-DD_DEPT'
+    const [viewMode, setViewMode] = useState<'OVERVIEW' | 'MY_TEAM'>('OVERVIEW');
 
     // Helper to get ISO Week
     const getISOWeek = (d: Date) => {
@@ -173,7 +174,7 @@ export const RenfortsWidget: React.FC = () => {
     // --- RENDER ---
 
     // 1. PRODUCTION VIEW (Hierarchical)
-    if (user?.department === 'PRODUCTION' && currentDept === 'PRODUCTION') {
+    if (user?.department === 'PRODUCTION' && currentDept === 'PRODUCTION' && viewMode === 'OVERVIEW') {
         const sortedWeeks = Object.entries(groupedByWeek).sort((a, b) => b[0].localeCompare(a[0])); // Recent first
 
         return (
@@ -185,6 +186,16 @@ export const RenfortsWidget: React.FC = () => {
                     <div>
                         <h2 className="text-2xl font-bold text-white">Renforts Global</h2>
                         <p className="text-slate-400">Vue d'overview par Semaine et Département</p>
+
+                    </div>
+                    <div className="ml-auto">
+                        <button
+                            onClick={() => setViewMode('MY_TEAM')}
+                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                        >
+                            <UserPlus className="h-4 w-4" />
+                            Gérer mes Renforts
+                        </button>
                     </div>
                 </div>
 
@@ -347,6 +358,16 @@ export const RenfortsWidget: React.FC = () => {
                         </p>
                     </div>
                 </div>
+
+                {user?.department === 'PRODUCTION' && (
+                    <button
+                        onClick={() => setViewMode('OVERVIEW')}
+                        className="bg-cinema-700 hover:bg-cinema-600 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                    >
+                        <Users className="h-4 w-4" />
+                        Vue Globale
+                    </button>
+                )}
 
                 <div className="flex items-center gap-4 bg-cinema-900 rounded-lg p-1 border border-cinema-700">
                     <button onClick={() => changeWeek('prev')} className="p-2 text-slate-400 hover:text-white transition-colors">
