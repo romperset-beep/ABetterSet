@@ -2,10 +2,27 @@ import React, { useState, useEffect } from 'react';
 import { Department, SurplusAction } from '../types';
 import { Users, ShoppingBag, MessageSquare, FileText, Receipt, Utensils, Clock, Truck } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { DndContext, closestCenter, TouchSensor, MouseSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 // --- Widget Components ---
+
+const SortableWidget = ({ id, children }: { id: string, children: React.ReactNode }) => {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 50 : 'auto',
+        opacity: isDragging ? 0.8 : 1,
+        height: '100%'
+    };
+    return (
+        <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="touch-none select-none h-full">
+            {children}
+        </div>
+    );
+};
 
 const InventoryWidget = ({ onClick }: { onClick: () => void }) => {
     const { project, currentDept } = useProject();
@@ -226,7 +243,7 @@ interface ProjectManagerProps {
 export const ProjectManager: React.FC<ProjectManagerProps> = ({
     setActiveTab,
 }) => {
-    const { currentDept, setCurrentDept, user, t } = useProject();
+    const { currentDept, setCurrentDept, user, updateUser, t } = useProject();
 
     // --- Dashboard Order Logic ---
     const allWidgets = [
@@ -240,14 +257,35 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({
     // Load user preference on mount/user change
     useEffect(() => {
         if (user?.dashboardOrder && user.dashboardOrder.length > 0) {
-            // Merge in any new widgets that might be missing from saved preference
+            // Merge in any new widgets
             const saved = user.dashboardOrder;
             const missing = allWidgets.filter(w => !saved.includes(w));
             setWidgetOrder([...saved, ...missing]);
         } else {
             setWidgetOrder(allWidgets);
         }
-    }, [user?.dashboardOrder]); // Do NOT depend on user object deep change, just dashboardOrder
+    }, [user?.dashboardOrder]);
+
+    // DnD Sensors
+    const sensors = useSensors(
+        useSensor(MouseSensor, { activationConstraint: { distance: 10 } }), // Prevent accidental drags
+        useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }) // Long press to drag on specific mobile
+    );
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (active.id !== over?.id) {
+            setWidgetOrder((items) => {
+                const oldIndex = items.indexOf(active.id as string);
+                const newIndex = items.indexOf(over?.id as string);
+                const newOrder = arrayMove(items, oldIndex, newIndex);
+
+                // Persist order
+                updateUser({ dashboardOrder: newOrder });
+                return newOrder;
+            });
+        }
+    };
 
     // Render helper
     const renderWidget = (id: string) => {
@@ -277,7 +315,7 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({
             <div className="bg-cinema-800 rounded-xl p-6 border border-cinema-700 shadow-lg flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
                     <h2 className="text-2xl font-bold text-white">{t('sidebar.dashboard')}</h2>
-                    <p className="text-slate-400 text-sm">{t('login.welcome')}</p>
+                    <p className="text-slate-400 text-sm">Maintenez appuyé pour réorganiser • {t('login.welcome')}</p>
                 </div>
                 <div className="flex items-center gap-3 bg-cinema-900 p-2 rounded-lg border border-cinema-700">
                     <Users className="text-eco-400 h-5 w-5" />
@@ -296,18 +334,30 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({
                 </div>
             </div>
 
-            {/* Grid without DnD Context */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {widgetOrder.map((id) => {
-                    const widget = renderWidget(id);
-                    if (!widget) return null; // Logic to hide unauthorized widgets
-                    return (
-                        <div key={id} className="h-full">
-                            {widget}
-                        </div>
-                    );
-                })}
-            </div>
+            {/* Draggable Grid */}
+            <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+            >
+                <SortableContext
+                    items={widgetOrder}
+                    strategy={rectSortingStrategy}
+                >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {widgetOrder.map((id) => {
+                            const widget = renderWidget(id);
+                            if (!widget) return null;
+
+                            return (
+                                <SortableWidget key={id} id={id}>
+                                    {widget}
+                                </SortableWidget>
+                            );
+                        })}
+                    </div>
+                </SortableContext>
+            </DndContext>
         </div>
     );
 };

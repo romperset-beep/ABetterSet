@@ -60,6 +60,7 @@ interface ProjectContextType {
 
   // Auth
   user: User | null;
+  updateUser: (data: Partial<User>) => Promise<void>; // Added
   login: (email: string, pass: string) => Promise<void>;
   register: (email: string, pass: string, name: string, dept: Department | 'PRODUCTION') => Promise<void>; // Added
   resetPassword: (email: string) => Promise<void>; // Added
@@ -1339,6 +1340,23 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     });
   };
 
+  const updateUser = async (data: Partial<User>) => {
+    if (!user) return;
+    const updatedUser = { ...user, ...data };
+    setUser(updatedUser);
+    localStorage.setItem('aBetterSetUser', JSON.stringify(updatedUser));
+
+    // Sync to Firestore
+    if (auth.currentUser) {
+      try {
+        const userRef = doc(db, 'users', user.id);
+        await updateDoc(userRef, data);
+      } catch (error) {
+        console.error("Failed to update user in Firestore:", error);
+      }
+    }
+  };
+
   const unreadCount = project.items.filter(i =>
     !i.purchased &&
     (user?.department === 'PRODUCTION' || user?.department === 'Régie' || i.department === user?.department)
@@ -1362,6 +1380,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       circularView,
       setCircularView,
       user,
+      updateUser, // Added
       login,
       register,
       resetPassword,
