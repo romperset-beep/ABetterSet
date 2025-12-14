@@ -39,6 +39,7 @@ const AppContent: React.FC = () => {
     unreadNotificationCount,
     notifications, // Added
     markAsRead, // Added
+    markAllAsRead, // Added
     logout,
     t,
     project, setCurrentDept, updateProjectDetails, setSocialAudience, setSocialTargetDept, setSocialTargetUserId, socialPosts, userProfiles } = useProject();
@@ -80,10 +81,18 @@ const AppContent: React.FC = () => {
     }
   };
 
-  const markAllNofiticationsRead = () => {
-    displayNotifications.forEach(n => {
-      if (!n.read) markAsRead(n.id);
+  // We want to mark ALL distinct unread notifications visible (or theoretically visible) as read
+  const markAllNofiticationsRead = async () => {
+    // Collect IDs of ALL unread notifications for this user, not just the top 10 displayed
+    const allUnread = notifications.filter(n => {
+      if (n.read) return false;
+      if (user?.department === 'PRODUCTION' || user?.department === 'Régie') return true;
+      return n.targetDept === user?.department || n.targetDept === undefined;
     });
+
+    if (allUnread.length > 0) {
+      await markAllAsRead(allUnread.map(n => n.id));
+    }
     setShowNotifications(false);
   };
 

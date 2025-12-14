@@ -69,13 +69,14 @@ interface ProjectContextType {
   deleteProject: (projectId: string) => Promise<void>;
   removeProjectFromHistory: (projectId: string) => Promise<void>; // Added
 
-  logout: () => void;
+  logout: () => Promise<void>;
 
   // Notifications
   notifications: Notification[];
-  addNotification: (msg: string, type: Notification['type'], target?: Department | 'PRODUCTION', itemId?: string) => void;
-  markAsRead: (id: string) => void;
-  markNotificationAsReadByItemId: (itemId: string) => void;
+  addNotification: (message: string, type: Notification['type'], target?: Department | 'PRODUCTION', itemId?: string) => Promise<void>;
+  markAsRead: (id: string) => Promise<void>;
+  markAllAsRead: (notificationIds: string[]) => Promise<void>; // Added
+  markNotificationAsReadByItemId: (itemId: string) => Promise<void>;
   unreadCount: number;
   unreadSocialCount: number;
   unreadMarketplaceCount: number;
@@ -1016,6 +1017,23 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
+  const markAllAsRead = async (notificationIds: string[]) => {
+    // 1. Optimistic Update
+    setNotifications(prev => prev.map(n => notificationIds.includes(n.id) ? { ...n, read: true } : n));
+
+    // 2. Batch Update
+    try {
+      const projectId = project.id;
+      const batchUpdates = notificationIds.map(id => {
+        const notifRef = doc(db, 'projects', projectId, 'notifications', id);
+        return updateDoc(notifRef, { read: true });
+      });
+      await Promise.all(batchUpdates);
+    } catch (err) {
+      console.error("Failed to mark all as read:", err);
+    }
+  };
+
   const markNotificationAsReadByItemId = async (itemId: string) => {
     // Find notifications related to this item
     const targetNotifs = notifications.filter(n => n.itemId === itemId && !n.read);
@@ -1388,6 +1406,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       notifications: userNotifications,
       addNotification,
       markAsRead,
+      markAllAsRead, // Added
       markNotificationAsReadByItemId,
       unreadCount,
       unreadSocialCount,
