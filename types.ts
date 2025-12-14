@@ -73,11 +73,19 @@ export interface Project {
   reinforcements?: Reinforcement[];
 }
 
+export interface ReinforcementDetail {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+}
+
 export interface Reinforcement {
   id: string; // date_dept_index or similar
   date: string; // YYYY-MM-DD
   department: Department | 'PRODUCTION';
-  names: string[]; // List of names
+  names?: string[]; // Legacy support
+  staff?: ReinforcementDetail[]; // New structure
 }
 
 export interface CateringLog {

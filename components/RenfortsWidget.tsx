@@ -1,11 +1,10 @@
-
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useProject } from '../context/ProjectContext';
-import { Department, Reinforcement } from '../types';
-import { Users, ChevronLeft, ChevronRight, UserPlus, X, Calendar } from 'lucide-react';
+import { Department, Reinforcement, ReinforcementDetail } from '../types';
+import { Users, ChevronLeft, ChevronRight, UserPlus, X, Calendar, Phone, Mail, User } from 'lucide-react';
 
 export const RenfortsWidget: React.FC = () => {
-    const { project, updateProjectDetails, user, currentDept } = useProject();
+    const { project, updateProjectDetails, user, currentDept, addNotification } = useProject();
     const [selectedDate, setSelectedDate] = useState(new Date());
 
     // Helper to get week days
@@ -26,7 +25,7 @@ export const RenfortsWidget: React.FC = () => {
 
     const days = getWeekDays(selectedDate);
     const weekStart = days[0];
-    const weekEnd = days[6];
+    const weekEnd = days[6]; // Not used but good to have
 
     const changeWeek = (direction: 'prev' | 'next') => {
         const newDate = new Date(selectedDate);
@@ -34,8 +33,10 @@ export const RenfortsWidget: React.FC = () => {
         setSelectedDate(newDate);
     };
 
-    // State for simple adding
-    const [newDesc, setNewDesc] = useState('');
+    // State for Enhanced Adding
+    const [newName, setNewName] = useState('');
+    const [newPhone, setNewPhone] = useState('');
+    const [newEmail, setNewEmail] = useState('');
     const [addingToDate, setAddingToDate] = useState<string | null>(null);
 
     // Helpers
@@ -43,67 +44,91 @@ export const RenfortsWidget: React.FC = () => {
         return (project.reinforcements || []).filter(r => r.date === dateStr && r.department === dept);
     };
 
+    const getStaffList = (r: Reinforcement): ReinforcementDetail[] => {
+        if (r.staff && r.staff.length > 0) return r.staff;
+        // Legacy fallback
+        if (r.names && r.names.length > 0) {
+            return r.names.map((n, i) => ({ id: `${r.id}_legacy_${i}`, name: n }));
+        }
+        return [];
+    };
+
     const handleAddReinforcement = async (dateStr: string) => {
-        if (!newDesc.trim()) return;
-
-        const existing = (project.reinforcements || []).find(r => r.date === dateStr && r.department === (user?.department === 'PRODUCTION' && currentDept !== 'PRODUCTION' ? currentDept : user?.department));
-
-        // Determine target department
-        // If Production is viewing a specific dept -> Add for that dept? No, usually Prod adds for Prod?
-        // User request: "accessible pour la production rangé par département".
-        // Let's assume Production adds for "currentDept" if selected, otherwise blocked?
-        // Actually, let's keep it simple: You add for YOUR department unless you are Prod, then ???
-        // Let's assume Prod can switch context using the global selector.
-        // If Prod is in "PRODUCTION" mode, they see ALL. Can they add? Maybe not easily without picking dept.
-        // Let's restricts: Department adds for THEM.
-        // Prod adds for... Prod? 
-        // Or Prod manages ALL?
-        // Let's use `currentDept` from context.
+        if (!newName.trim()) return;
 
         const targetDept = user?.department === 'PRODUCTION' ? currentDept : user?.department;
         if (!targetDept) return;
 
+        const existing = (project.reinforcements || []).find(r => r.date === dateStr && r.department === targetDept);
         let newReinforcements = [...(project.reinforcements || [])];
 
+        const newStaff: ReinforcementDetail = {
+            id: `staff_${Date.now()}`,
+            name: newName.trim(),
+            phone: newPhone.trim(),
+            email: newEmail.trim()
+        };
+
         if (existing) {
-            const updated = { ...existing, names: [...existing.names, newDesc.trim()] };
+            // Migrate legacy names if mixed? Or just append to staff.
+            // Best to unify.
+            const currentStaff = getStaffList(existing);
+            const updatedStaff = [...currentStaff, newStaff];
+
+            // Update logic: we now use 'staff' primarily.
+            const updated = { ...existing, staff: updatedStaff };
+            // Clear legacy names to avoid duplication display if we used fallback
+            if (updated.names) delete (updated as any).names;
+
             newReinforcements = newReinforcements.map(r => r.id === existing.id ? updated : r);
         } else {
             const newR: Reinforcement = {
                 id: `${dateStr}_${targetDept}`,
                 date: dateStr,
                 department: targetDept as any,
-                names: [newDesc.trim()]
+                staff: [newStaff]
             };
             newReinforcements.push(newR);
         }
 
         await updateProjectDetails({ reinforcements: newReinforcements });
-        setNewDesc('');
+
+        // Notification Logic
+        if (user?.department !== 'PRODUCTION') {
+            addNotification(
+                `Nouveau Renfort : ${newStaff.name} (${targetDept}) pour le ${new Date(dateStr).toLocaleDateString()}`,
+                'INFO',
+                'PRODUCTION'
+            );
+        }
+
+        setNewName('');
+        setNewPhone('');
+        setNewEmail('');
         setAddingToDate(null);
     };
 
-    const handleRemoveReinforcement = async (dateStr: string, dept: string, nameIndex: number) => {
+    const handleRemoveReinforcement = async (dateStr: string, dept: string, staffId: string) => {
         if (!window.confirm('Supprimer ce renfort ?')) return;
 
         const existing = (project.reinforcements || []).find(r => r.date === dateStr && r.department === dept);
         if (!existing) return;
 
-        const newNames = existing.names.filter((_, i) => i !== nameIndex);
+        const currentStaff = getStaffList(existing);
+        const newStaff = currentStaff.filter(s => s.id !== staffId);
+
         let newReinforcements = [...(project.reinforcements || [])];
 
-        if (newNames.length === 0) {
-            // Remove object if empty
+        if (newStaff.length === 0) {
             newReinforcements = newReinforcements.filter(r => r.id !== existing.id);
         } else {
-            newReinforcements = newReinforcements.map(r => r.id === existing.id ? { ...existing, names: newNames } : r);
+            const updated = { ...existing, staff: newStaff };
+            if (updated.names) delete (updated as any).names;
+            newReinforcements = newReinforcements.map(r => r.id === existing.id ? updated : r);
         }
 
         await updateProjectDetails({ reinforcements: newReinforcements });
     };
-
-    // Calculate Total Reinforcements for the Week per Department
-    // For Production View summary
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-8">
@@ -161,31 +186,48 @@ export const RenfortsWidget: React.FC = () => {
                                 {/* If Production View: Show ALL Departments */}
                                 {user?.department === 'PRODUCTION' && currentDept === 'PRODUCTION' ? (
                                     <div className="space-y-3">
-                                        {/* Group by Dept */}
                                         {Object.values(Department).map(dept => {
                                             const items = getReinforcements(dateStr, dept);
-                                            if (!items.length || !items[0].names.length) return null;
+                                            const staffList = items.length ? getStaffList(items[0]) : [];
+                                            if (!staffList.length) return null;
 
                                             return (
                                                 <div key={dept} className="bg-cinema-900/50 rounded-lg p-2 border border-cinema-700">
-                                                    <div className="text-[10px] text-slate-500 font-bold uppercase mb-1">{dept}</div>
-                                                    <div className="space-y-1">
-                                                        {items[0].names.map((name, idx) => (
-                                                            <div key={idx} className="flex justify-between items-center group">
-                                                                <span className="text-xs text-white truncate">{name}</span>
-                                                                <button
-                                                                    onClick={() => handleRemoveReinforcement(dateStr, dept, idx)}
-                                                                    className="hidden group-hover:block text-red-400 hover:text-red-300"
-                                                                >
-                                                                    <X className="h-3 w-3" />
-                                                                </button>
+                                                    <div className="text-[10px] text-slate-500 font-bold uppercase mb-2 border-b border-cinema-700 pb-1">{dept}</div>
+                                                    <div className="space-y-2">
+                                                        {staffList.map((s) => (
+                                                            <div key={s.id} className="group relative">
+                                                                <div className="flex justify-between items-start">
+                                                                    <div>
+                                                                        <span className="text-xs text-white font-medium block">{s.name}</span>
+                                                                        <div className="flex flex-col gap-0.5 mt-0.5">
+                                                                            {s.phone && (
+                                                                                <a href={`tel:${s.phone}`} className="text-[10px] text-slate-400 flex items-center gap-1 hover:text-indigo-400">
+                                                                                    <Phone className="h-2 w-2" /> {s.phone}
+                                                                                </a>
+                                                                            )}
+                                                                            {s.email && (
+                                                                                <a href={`mailto:${s.email}`} className="text-[10px] text-slate-400 flex items-center gap-1 hover:text-indigo-400">
+                                                                                    <Mail className="h-2 w-2" /> {s.email}
+                                                                                </a>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={() => handleRemoveReinforcement(dateStr, dept, s.id)}
+                                                                        className="hidden group-hover:block text-red-400 hover:text-red-300"
+                                                                        title="Supprimer"
+                                                                    >
+                                                                        <X className="h-3 w-3" />
+                                                                    </button>
+                                                                </div>
                                                             </div>
                                                         ))}
                                                     </div>
                                                 </div>
                                             );
                                         })}
-                                        {/* Empty State for Prod if no data at all for this day */}
+                                        {/* Empty State for Prod if no data */}
                                         {!(project.reinforcements || []).some(r => r.date === dateStr) && (
                                             <div className="text-center py-4 opacity-30">
                                                 <Users className="h-6 w-6 mx-auto mb-2 text-slate-500" />
@@ -197,20 +239,32 @@ export const RenfortsWidget: React.FC = () => {
                                     // Department View (or Prod filtered)
                                     <div className="h-full flex flex-col">
                                         <div className="flex-1 space-y-2">
-                                            {/* Show existing */}
                                             {(() => {
                                                 const targetDept = user?.department === 'PRODUCTION' ? currentDept : user?.department;
-                                                // If Prod is in "Production" mode, we handled above. 
-                                                // If Prod selected a Dept, or if User is Dept.
-
                                                 const items = getReinforcements(dateStr, targetDept as string);
+                                                const staffList = items.length ? getStaffList(items[0]) : [];
 
-                                                return items.length > 0 && items[0].names.length > 0 ? (
-                                                    items[0].names.map((name, idx) => (
-                                                        <div key={idx} className="bg-slate-700/30 px-3 py-2 rounded-lg flex justify-between items-center border border-transparent hover:border-slate-600 transition-colors group">
-                                                            <span className="text-sm text-slate-200">{name}</span>
+                                                return staffList.length > 0 ? (
+                                                    staffList.map((s) => (
+                                                        <div key={s.id} className="bg-slate-700/30 px-3 py-2 rounded-lg flex justify-between items-start border border-transparent hover:border-slate-600 transition-colors group">
+                                                            <div>
+                                                                <div className="text-sm text-slate-200 font-medium">{s.name}</div>
+                                                                <div className="flex flex-col mt-1 gap-0.5">
+                                                                    {s.phone && (
+                                                                        <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                                                                            <Phone className="h-2.5 w-2.5" /> {s.phone}
+                                                                        </div>
+                                                                    )}
+                                                                    {s.email && (
+                                                                        <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                                                                            <Mail className="h-2.5 w-2.5" /> {s.email}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
                                                             <button
-                                                                onClick={() => handleRemoveReinforcement(dateStr, targetDept as string, idx)}
+                                                                onClick={() => handleRemoveReinforcement(dateStr, targetDept as string, s.id)}
                                                                 className="text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
                                                             >
                                                                 <X className="h-4 w-4" />
@@ -228,33 +282,60 @@ export const RenfortsWidget: React.FC = () => {
                                             })()}
                                         </div>
 
-                                        {/* Add Input */}
+                                        {/* Enhanced Add Input */}
                                         {addingToDate === dateStr && (
-                                            <div className="mt-2 animate-in fade-in slide-in-from-bottom-2">
-                                                <input
-                                                    autoFocus
-                                                    type="text"
-                                                    placeholder="Nom..."
-                                                    className="w-full bg-cinema-900 border border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none mb-2"
-                                                    value={newDesc}
-                                                    onChange={e => setNewDesc(e.target.value)}
-                                                    onKeyDown={e => {
-                                                        if (e.key === 'Enter') handleAddReinforcement(dateStr);
-                                                        if (e.key === 'Escape') { setAddingToDate(null); setNewDesc(''); }
-                                                    }}
-                                                    onBlur={() => {
-                                                        // Optional: Save on blur or cancel? Let's cancel to prevent accident
-                                                        // setAddingToDate(null); 
-                                                    }}
-                                                />
+                                            <div className="mt-2 animate-in fade-in slide-in-from-bottom-2 bg-cinema-900/80 p-3 rounded-lg border border-indigo-500/50 shadow-lg relative z-10">
+                                                <div className="space-y-2 mb-3">
+                                                    <div className="relative">
+                                                        <User className="h-3 w-3 absolute left-2 top-2.5 text-slate-500" />
+                                                        <input
+                                                            autoFocus
+                                                            type="text"
+                                                            placeholder="Nom (Requis)"
+                                                            className="w-full bg-cinema-800 border border-cinema-700 rounded px-2 py-1.5 pl-7 text-xs text-white focus:outline-none focus:border-indigo-500"
+                                                            value={newName}
+                                                            onChange={e => setNewName(e.target.value)}
+                                                        />
+                                                    </div>
+                                                    <div className="relative">
+                                                        <Phone className="h-3 w-3 absolute left-2 top-2.5 text-slate-500" />
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Téléphone"
+                                                            className="w-full bg-cinema-800 border border-cinema-700 rounded px-2 py-1.5 pl-7 text-xs text-white focus:outline-none focus:border-indigo-500"
+                                                            value={newPhone}
+                                                            onChange={e => setNewPhone(e.target.value)}
+                                                        />
+                                                    </div>
+                                                    <div className="relative">
+                                                        <Mail className="h-3 w-3 absolute left-2 top-2.5 text-slate-500" />
+                                                        <input
+                                                            type="email"
+                                                            placeholder="Email"
+                                                            className="w-full bg-cinema-800 border border-cinema-700 rounded px-2 py-1.5 pl-7 text-xs text-white focus:outline-none focus:border-indigo-500"
+                                                            value={newEmail}
+                                                            onChange={e => setNewEmail(e.target.value)}
+                                                            onKeyDown={e => {
+                                                                if (e.key === 'Enter') handleAddReinforcement(dateStr);
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+
                                                 <div className="flex gap-2 justify-end">
-                                                    <button onClick={() => setAddingToDate(null)} className="text-xs text-slate-400 hover:text-white px-2 py-1">Annuler</button>
-                                                    <button onClick={() => handleAddReinforcement(dateStr)} className="text-xs bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-500">OK</button>
+                                                    <button onClick={() => { setAddingToDate(null); setNewName(''); setNewPhone(''); setNewEmail(''); }} className="text-xs text-slate-400 hover:text-white px-2 py-1">Annuler</button>
+                                                    <button
+                                                        onClick={() => handleAddReinforcement(dateStr)}
+                                                        disabled={!newName.trim()}
+                                                        className="text-xs bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    >
+                                                        OK
+                                                    </button>
                                                 </div>
                                             </div>
                                         )}
 
-                                        {/* Mini Add Button if list not empty */}
+                                        {/* Mini Add Button */}
                                         {addingToDate !== dateStr && getReinforcements(dateStr, user?.department === 'PRODUCTION' ? currentDept : user?.department || '').length > 0 && (
                                             <button
                                                 onClick={() => setAddingToDate(dateStr)}
@@ -266,7 +347,6 @@ export const RenfortsWidget: React.FC = () => {
                                         )}
                                     </div>
                                 )}
-
                             </div>
                         </div>
                     );
