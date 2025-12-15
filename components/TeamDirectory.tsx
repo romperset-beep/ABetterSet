@@ -88,9 +88,13 @@ export const TeamDirectory: React.FC = () => {
                                         </div>
                                         {/* Status Badges */}
                                         <div className="flex gap-1">
-                                            {profile.rib && <div title="RIB" className="h-2 w-2 rounded-full bg-green-500" />}
-                                            {profile.idCard && <div title="CNI" className="h-2 w-2 rounded-full bg-blue-500" />}
-                                            {profile.cmbCard && <div title="CMB" className="h-2 w-2 rounded-full bg-purple-500" />}
+                                            {currentDept === 'PRODUCTION' && (
+                                                <>
+                                                    {profile.rib && <div title="RIB" className="h-2 w-2 rounded-full bg-green-500" />}
+                                                    {profile.idCard && <div title="CNI" className="h-2 w-2 rounded-full bg-blue-500" />}
+                                                    {profile.cmbCard && <div title="CMB" className="h-2 w-2 rounded-full bg-purple-500" />}
+                                                </>
+                                            )}
                                         </div>
                                     </div>
 
@@ -158,6 +162,7 @@ const DocumentButton = ({ label, hasDoc, url }: { label: string, hasDoc: boolean
 };
 
 const ProfileDetailModal = ({ profile, onClose }: { profile: any, onClose: () => void }) => {
+    const { currentDept } = useProject();
     if (!profile) return null;
 
     return (
@@ -174,50 +179,60 @@ const ProfileDetailModal = ({ profile, onClose }: { profile: any, onClose: () =>
                 </header>
 
                 <div className="p-8 space-y-8">
-                    {/* Personal Info */}
+                    {/* Personal Info - LIMITED for non-production */}
                     <section>
                         <h3 className="text-lg font-bold text-eco-400 mb-4 border-b border-cinema-700/50 pb-2">Informations Personnelles</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
                             <DetailRow label="Email" value={profile.email} />
                             <DetailRow label="Téléphone" value={profile.phone} />
-                            <DetailRow label="Adresse" value={`${profile.address || ''} ${profile.postalCode || ''} ${profile.city || ''}`} className="col-span-2" />
-                            <DetailRow label="Situation Familiale" value={profile.familyStatus} />
+
+                            {currentDept === 'PRODUCTION' && (
+                                <>
+                                    <DetailRow label="Adresse" value={`${profile.address || ''} ${profile.postalCode || ''} ${profile.city || ''}`} className="col-span-2" />
+                                    <DetailRow label="Situation Familiale" value={profile.familyStatus} />
+                                </>
+                            )}
                         </div>
                     </section>
 
-                    {/* Civil Status */}
-                    <section>
-                        <h3 className="text-lg font-bold text-blue-400 mb-4 border-b border-cinema-700/50 pb-2">État Civil & Social</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
-                            <DetailRow label="Date de Naissance" value={`${profile.birthDate || ''} à ${profile.birthPlace || ''} (${profile.birthCountry || ''})`} />
-                            <DetailRow label="Nationalité" value={profile.nationality} />
-                            <DetailRow label="Numéro Sécu" value={profile.ssn} />
-                            <DetailRow label="Centre Sécu" value={profile.socialSecurityCenterAddress} />
-                        </div>
-                    </section>
+                    {/* Restricted Sections - PRODUCTION ONLY */}
+                    {currentDept === 'PRODUCTION' && (
+                        <>
+                            {/* Civil Status */}
+                            <section>
+                                <h3 className="text-lg font-bold text-blue-400 mb-4 border-b border-cinema-700/50 pb-2">État Civil & Social</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+                                    <DetailRow label="Date de Naissance" value={`${profile.birthDate || ''} à ${profile.birthPlace || ''} (${profile.birthCountry || ''})`} />
+                                    <DetailRow label="Nationalité" value={profile.nationality} />
+                                    <DetailRow label="Numéro Sécu" value={profile.ssn} />
+                                    <DetailRow label="Centre Sécu" value={profile.socialSecurityCenterAddress} />
+                                </div>
+                            </section>
 
-                    {/* Emergency */}
-                    <section>
-                        <h3 className="text-lg font-bold text-red-400 mb-4 border-b border-cinema-700/50 pb-2">Urgence & Médical</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
-                            <DetailRow label="Contact Urgence" value={profile.emergencyContactName} />
-                            <DetailRow label="Tél Urgence" value={profile.emergencyContactPhone} />
-                            <DetailRow label="N° Congés Spectacle" value={profile.congeSpectacleNumber} />
-                            <DetailRow label="Dernière Visite Médicale" value={profile.lastMedicalVisit} />
-                            <DetailRow label="Retraité" value={profile.isRetired ? "Oui" : "Non"} />
-                        </div>
-                    </section>
+                            {/* Emergency */}
+                            <section>
+                                <h3 className="text-lg font-bold text-red-400 mb-4 border-b border-cinema-700/50 pb-2">Urgence & Médical</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+                                    <DetailRow label="Contact Urgence" value={profile.emergencyContactName} />
+                                    <DetailRow label="Tél Urgence" value={profile.emergencyContactPhone} />
+                                    <DetailRow label="N° Congés Spectacle" value={profile.congeSpectacleNumber} />
+                                    <DetailRow label="Dernière Visite Médicale" value={profile.lastMedicalVisit} />
+                                    <DetailRow label="Retraité" value={profile.isRetired ? "Oui" : "Non"} />
+                                </div>
+                            </section>
 
-                    {/* Quick Docs Access */}
-                    <section>
-                        <h3 className="text-lg font-bold text-purple-400 mb-4 border-b border-cinema-700/50 pb-2">Documents</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <DocumentButton label="RIB" hasDoc={!!profile.rib} url={profile.rib} />
-                            <DocumentButton label="CNI" hasDoc={!!profile.idCard} url={profile.idCard} />
-                            <DocumentButton label="CMB" hasDoc={!!profile.cmbCard} url={profile.cmbCard} />
-                            <DocumentButton label="Permis" hasDoc={!!profile.drivingLicense} url={profile.drivingLicense} />
-                        </div>
-                    </section>
+                            {/* Quick Docs Access */}
+                            <section>
+                                <h3 className="text-lg font-bold text-purple-400 mb-4 border-b border-cinema-700/50 pb-2">Documents</h3>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <DocumentButton label="RIB" hasDoc={!!profile.rib} url={profile.rib} />
+                                    <DocumentButton label="CNI" hasDoc={!!profile.idCard} url={profile.idCard} />
+                                    <DocumentButton label="CMB" hasDoc={!!profile.cmbCard} url={profile.cmbCard} />
+                                    <DocumentButton label="Permis" hasDoc={!!profile.drivingLicense} url={profile.drivingLicense} />
+                                </div>
+                            </section>
+                        </>
+                    )}
                 </div>
             </div>
         </div>

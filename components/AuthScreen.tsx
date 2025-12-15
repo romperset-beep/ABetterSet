@@ -1,18 +1,29 @@
 import React, { useState } from 'react';
 import { Department } from '../types';
-import { Mail, Lock, User, Briefcase, ArrowRight, Loader2 } from 'lucide-react';
+import { Mail, Lock, User, Briefcase, ArrowRight, Loader2, RefreshCw, Send, CheckCircle } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
+import { GdprModal } from './GdprModal';
+import { auth } from '../services/firebase';
+import { sendEmailVerification } from 'firebase/auth';
 
 interface AuthScreenProps {
     onSuccess: () => void;
 }
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess }) => {
-    const { login, register, resetPassword, error: authError } = useProject();
+    const { login, register, resetPassword, resendVerification, refreshUser, error: authError } = useProject();
     const [isSignUp, setIsSignUp] = useState(false);
     const [isResettingPassword, setIsResettingPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [resetSuccess, setResetSuccess] = useState(false);
+
+    // GDPR State
+    const [gdprAccepted, setGdprAccepted] = useState(false);
+    const [showGdprModal, setShowGdprModal] = useState(false);
+
+    // Verification State
+    const [showVerification, setShowVerification] = useState(false);
+    const [verificationSent, setVerificationSent] = useState(false);
 
     const [formData, setFormData] = useState({
         email: '',
@@ -31,15 +42,24 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess }) => {
                 await resetPassword(formData.email);
                 setResetSuccess(true);
             } else if (isSignUp) {
+                if (!gdprAccepted) throw new Error("Veuillez accepter les conditions RGPD.");
                 if (formData.password !== formData.confirmPassword) {
                     throw new Error("Les mots de passe ne correspondent pas");
                 }
                 // @ts-ignore
                 await register(formData.email, formData.password, formData.name, formData.department);
-                onSuccess();
+                // Don't call onSuccess(), Show Verification Screen
+                setShowVerification(true);
             } else {
                 // @ts-ignore
                 await login(formData.email, formData.password);
+
+                // Check Verification
+                if (auth.currentUser && !auth.currentUser.emailVerified) {
+                    setShowVerification(true);
+                    return;
+                }
+
                 onSuccess();
             }
         } catch (err: any) {
@@ -54,6 +74,102 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess }) => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
+
+    const handleCheckVerification = async () => {
+        setIsLoading(true);
+        try {
+            if (auth.currentUser) {
+                await auth.currentUser.reload();
+                if (auth.currentUser.emailVerified) {
+                    // Refresh context state to unblock app
+                    await refreshUser();
+                    onSuccess();
+                } else {
+                    alert("Email non vérifié. Veuillez cliquer sur le lien reçu par email.");
+                }
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleResend = async () => {
+        try {
+            await resendVerification();
+            setVerificationSent(true);
+            setTimeout(() => setVerificationSent(false), 5000);
+        } catch (e) {
+            console.error(e);
+            alert("Erreur lors de l'envoi. Veuillez réessayer plus tard.");
+        }
+    };
+
+    // --- Verification Screen ---
+    if (showVerification) {
+        return (
+            <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="bg-cinema-800 border border-cinema-700 p-8 rounded-2xl shadow-2xl relative z-10 text-center">
+                    <div className="flex justify-center mb-6">
+                        <div className="p-4 bg-eco-500/20 rounded-full animate-pulse">
+                            <Mail className="h-10 w-10 text-eco-400" />
+                        </div>
+                    </div>
+
+                    <h2 className="text-xl font-bold text-white mb-2">Vérification Requise</h2>
+                    <p className="text-slate-400 text-sm mb-6">
+                        Un email de vérification a été envoyé à <strong>{formData.email}</strong>.
+                        <br />
+                        Veuillez cliquer sur le lien pour activer votre compte.
+                        <br />
+                        <br />
+                        <span className="text-yellow-500/80 text-xs font-medium">⚠️ Pensez à vérifier vos courriers indésirables (Spams)</span>
+                    </p>
+
+                    <div className="space-y-4">
+                        <button
+                            onClick={handleCheckVerification}
+                            disabled={isLoading}
+                            className="w-full bg-eco-600 hover:bg-eco-500 text-white font-bold py-3 rounded-lg shadow-lg flex items-center justify-center gap-2 transition-all"
+                        >
+                            {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle className="h-5 w-5" />}
+                            J'ai vérifié mon email
+                        </button>
+
+                        <button
+                            onClick={handleResend}
+                            disabled={verificationSent}
+                            className="w-full bg-cinema-900 border border-cinema-700 hover:border-eco-500/50 text-slate-300 font-medium py-3 rounded-lg flex items-center justify-center gap-2 transition-all"
+                        >
+                            {verificationSent ? (
+                                <>
+                                    <CheckCircle className="h-4 w-4 text-green-500" />
+                                    Email envoyé !
+                                </>
+                            ) : (
+                                <>
+                                    <Send className="h-4 w-4" />
+                                    Renvoyer l'email
+                                </>
+                            )}
+                        </button>
+
+                        <button
+                            onClick={() => {
+                                setShowVerification(false);
+                                // Optional: Sign out if they back out?
+                                // signOut(auth);
+                            }}
+                            className="text-xs text-slate-500 hover:text-white"
+                        >
+                            Retour
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (isResettingPassword) {
         return (
@@ -250,19 +366,49 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess }) => {
                     )}
 
                     {isSignUp && (
-                        <div className="relative group">
-                            <Lock className="absolute left-3 top-3 h-5 w-5 text-slate-500 group-focus-within:text-eco-400 transition-colors" />
-                            <input
-                                type="password"
-                                name="confirmPassword"
-                                placeholder="Confirmer le code"
-                                value={formData.confirmPassword}
-                                onChange={handleChange}
-                                minLength={6}
-                                className="w-full bg-cinema-900 border border-cinema-700 rounded-lg pl-10 pr-4 py-3 text-white placeholder-slate-500 focus:ring-2 focus:ring-eco-500 focus:outline-none transition-all"
-                                required
-                            />
-                        </div>
+                        <>
+                            <div className="relative group">
+                                <Lock className="absolute left-3 top-3 h-5 w-5 text-slate-500 group-focus-within:text-eco-400 transition-colors" />
+                                <input
+                                    type="password"
+                                    name="confirmPassword"
+                                    placeholder="Confirmer le code"
+                                    value={formData.confirmPassword}
+                                    onChange={handleChange}
+                                    minLength={6}
+                                    className="w-full bg-cinema-900 border border-cinema-700 rounded-lg pl-10 pr-4 py-3 text-white placeholder-slate-500 focus:ring-2 focus:ring-eco-500 focus:outline-none transition-all"
+                                    required
+                                />
+                            </div>
+
+                            <div className="mt-4">
+                                <label className="flex items-start gap-3 cursor-pointer group">
+                                    <div className="relative flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            checked={gdprAccepted}
+                                            onChange={(e) => setGdprAccepted(e.target.checked)}
+                                            className="peer h-5 w-5 cursor-pointer appearance-none rounded-md border border-slate-600 bg-cinema-900 checked:border-eco-500 checked:bg-eco-500 transition-all"
+                                        />
+                                        <CheckCircle className="pointer-events-none absolute left-0.5 top-0.5 h-4 w-4 text-white opacity-0 peer-checked:opacity-100" />
+                                    </div>
+                                    <span className="text-xs text-slate-400 leading-tight group-hover:text-slate-300 transition-colors">
+                                        J'accepte les{' '}
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation(); // Prevent toggling checkbox
+                                                setShowGdprModal(true);
+                                            }}
+                                            className="text-eco-400 hover:underline font-medium hover:text-eco-300"
+                                        >
+                                            conditions générales d'utilisation (RGPD)
+                                        </button>
+                                        {' '}et la collecte de mes données professionnelles.
+                                    </span>
+                                </label>
+                            </div>
+                        </>
                     )}
 
                     <button
@@ -281,6 +427,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess }) => {
                     </button>
                 </form>
             </div>
+
+            {/* RGPD Modal */}
+            <GdprModal isOpen={showGdprModal} onClose={() => setShowGdprModal(false)} />
         </div>
     );
 };

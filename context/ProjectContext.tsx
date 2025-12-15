@@ -21,7 +21,7 @@ import {
 } from '../types';
 import { TRANSLATIONS } from './translations';
 import { db, auth } from '../services/firebase';
-import { signInAnonymously, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from 'firebase/auth';
+import { signInAnonymously, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, sendEmailVerification } from 'firebase/auth';
 import {
   collection,
   doc,
@@ -62,7 +62,9 @@ interface ProjectContextType {
   user: User | null;
   updateUser: (data: Partial<User>) => Promise<void>; // Added
   login: (email: string, pass: string) => Promise<void>;
-  register: (email: string, pass: string, name: string, dept: Department | 'PRODUCTION') => Promise<void>; // Added
+  register: (email: string, pass: string, name: string, dept: Department | 'PRODUCTION') => Promise<void>;
+  resendVerification: () => Promise<void>;
+  refreshUser: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>; // Added
   joinProject: (prod: string, film: string, start?: string, end?: string, type?: string) => Promise<void>;
   leaveProject: () => Promise<void>;
@@ -690,6 +692,14 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         console.log("Auth State: Logged In", firebaseUser.uid);
+
+        // Security: Require Email Verification
+        if (!firebaseUser.emailVerified) {
+          console.log("Auth: User email not verified. Blocking access.");
+          setUser(null);
+          return;
+        }
+
         // Fetch User Profile from Firestore
         const userRef = doc(db, 'users', firebaseUser.uid);
         try {
@@ -728,12 +738,30 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         setProject(DEFAULT_PROJECT);
       }
     });
+
     return () => unsubscribe();
   }, []);
+
+  const refreshUser = async () => {
+    if (auth.currentUser) {
+      await auth.currentUser.reload();
+      if (auth.currentUser.emailVerified) {
+        const userRef = doc(db, 'users', auth.currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          setUser(userSnap.data() as User);
+        }
+      }
+    }
+  };
 
   const register = async (email: string, pass: string, name: string, dept: Department | 'PRODUCTION') => {
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
+
+      // Send Verification Email
+      await sendEmailVerification(cred.user);
+
       // Create User Profile
       const newUser: User = {
         name,
@@ -744,13 +772,19 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       };
       await setDoc(doc(db, 'users', cred.user.uid), newUser);
 
-      // FIX: Explicitly set user state here to avoid race condition with onAuthStateChanged
-      setUser(newUser);
+      // DO NOT set user state here. onAuthStateChanged will handle it AND block unverified users.
+      // setUser(newUser); 
 
       addNotification(`Bienvenue ${name} !`, 'INFO', dept);
     } catch (err: any) {
       console.error("Registration Error", err);
       throw err; // Propagate to UI
+    }
+  };
+
+  const resendVerification = async () => {
+    if (auth.currentUser) {
+      await sendEmailVerification(auth.currentUser);
     }
   };
 
@@ -1401,6 +1435,8 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       updateUser, // Added
       login,
       register,
+      resendVerification,
+      refreshUser, // Added
       resetPassword,
       logout,
       notifications: userNotifications,

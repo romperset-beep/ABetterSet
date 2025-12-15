@@ -269,6 +269,7 @@ export interface ProjectSummary {
 }
 
 export interface User {
+  id?: string; // Added for reference
   name: string;
   email: string;
   department: Department | 'PRODUCTION';
