@@ -77,6 +77,7 @@ interface ProjectContextType {
   notifications: Notification[];
   addNotification: (message: string, type: Notification['type'], target?: Department | 'PRODUCTION', itemId?: string) => Promise<void>;
   markAsRead: (id: string) => Promise<void>;
+  deleteNotification: (id: string) => Promise<void>; // Added
   markAllAsRead: (notificationIds: string[]) => Promise<void>; // Added
   markNotificationAsReadByItemId: (itemId: string) => Promise<void>;
   unreadCount: number;
@@ -1068,6 +1069,19 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
+  const deleteNotification = async (id: string) => {
+    // Optimistic
+    setNotifications(prev => prev.filter(n => n.id !== id));
+
+    try {
+      const projectId = project.id;
+      const notifRef = doc(db, 'projects', projectId, 'notifications', id);
+      await deleteDoc(notifRef);
+    } catch (err) {
+      console.error("Failed to delete notification:", err);
+    }
+  };
+
   const markNotificationAsReadByItemId = async (itemId: string) => {
     // Find notifications related to this item
     const targetNotifs = notifications.filter(n => n.itemId === itemId && !n.read);
@@ -1361,14 +1375,13 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     const currentInfo = project.logistics || [];
     const newLogistics = [...currentInfo, request];
 
-    // Trigger Notification
-    if (user?.department !== 'PRODUCTION') {
-      addNotification(
-        `Demande transport (${request.type}) pour ${request.department} le ${new Date(request.date).toLocaleDateString()}`,
-        'INFO',
-        'PRODUCTION'
-      );
-    }
+    // Trigger Notification - ALWAYS.
+    // Even if Production creates it, we want a record/alert for others (Régie) or just confirmation.
+    addNotification(
+      `Demande transport (${request.type}) pour ${request.department} le ${new Date(request.date).toLocaleDateString()}`,
+      'INFO',
+      'PRODUCTION' // Target: Production/Régie usually handle this.
+    );
 
     await updateProjectDetails({ logistics: newLogistics });
   };
@@ -1442,6 +1455,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       notifications: userNotifications,
       addNotification,
       markAsRead,
+      deleteNotification, // Added
       markAllAsRead, // Added
       markNotificationAsReadByItemId,
       unreadCount,

@@ -62,13 +62,10 @@ export const TimesheetWidget: React.FC = () => {
         let duration = endMin - startMin;
 
         // Deductions
-        // 1. Meal: If continuous day, usually 20min paid break is INCLUDED in working time, so NO deduction.
-        //    If NOT continuous, deduct standard meal (60m) or shortened (30m).
-        if (!continuous) {
+        // 1. Meal: If NOT continuous day, always deduct.
+        //    If continuous day, normally NO deduction, BUT if a meal time is entered, we MUST deduct it.
+        if (!continuous || meal) {
             const mealDeduction = shortMeal ? 30 : 60;
-            // Only deduct meal if times are set, or just strictly apply rule? 
-            // The logic implies if you worked a full day you had a meal.
-            // Let's apply deduction.
             duration -= mealDeduction;
         }
 
@@ -128,13 +125,72 @@ export const TimesheetWidget: React.FC = () => {
 
     const isProduction = user?.department === 'PRODUCTION' || user?.department === 'Régie';
 
-    // Group logs by week
-    const getWeekNumber = (d: Date) => {
+    // Helper: Format Date DD/MM/YYYY
+    const formatDateFR = (dateStr: string | Date) => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    };
+
+    // Group logs by week (Relative or ISO)
+    const getWeekInfo = (d: Date) => {
+        // 1. Try Relative to Shooting Start
+        if (project.shootingStartDate) {
+            const start = new Date(project.shootingStartDate);
+            // Reset times to midnight for accurate day diff
+            const target = new Date(d);
+            target.setHours(0, 0, 0, 0);
+            start.setHours(0, 0, 0, 0);
+
+            // Calculate diff in days
+            const diffTime = target.getTime() - start.getTime();
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+            // If date is before start date, maybe use Pre-Prod weeks? Or just negative?
+            // For now let's handle "Week 1" as days 0-6.
+            const weekNum = Math.floor(diffDays / 7) + 1;
+
+            // Calculate start/end of this relative week
+            const weekStart = new Date(start);
+            weekStart.setDate(start.getDate() + (weekNum - 1) * 7);
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
+
+            return {
+                week: weekNum,
+                year: weekStart.getFullYear(), // Just for grouping key mostly
+                label: `Semaine ${weekNum}`,
+                startDate: weekStart,
+                endDate: weekEnd,
+                isRelative: true,
+                key: `S${weekNum}` // Simple key
+            };
+        }
+
+        // 2. Fallback to ISO Week
         d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
         d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
         const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
         const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-        return { week: weekNo, year: d.getUTCFullYear() };
+
+        // Calculate ISO Week dates (approx)
+        const simple = new Date(Date.UTC(d.getUTCFullYear(), 0, 1 + (weekNo - 1) * 7));
+        const dow = simple.getUTCDay();
+        const monday = simple;
+        if (dow <= 4) monday.setUTCDate(simple.getUTCDate() - simple.getUTCDay() + 1);
+        else monday.setUTCDate(simple.getUTCDate() + 8 - simple.getUTCDay());
+        const sunday = new Date(monday);
+        sunday.setUTCDate(monday.getUTCDate() + 6);
+
+        return {
+            week: weekNo,
+            year: d.getUTCFullYear(),
+            label: `Semaine ${weekNo} (ISO)`,
+            startDate: monday,
+            endDate: sunday,
+            isRelative: false,
+            key: `${d.getUTCFullYear()}-W${weekNo}`
+        };
     };
 
     // Personal Logs
@@ -175,20 +231,43 @@ export const TimesheetWidget: React.FC = () => {
     }, [viewMode, selectedUserId, personalLogs, project.timeLogs]);
 
     const weeklyData = useMemo(() => {
-        const weeks: Record<string, { totalHours: number, logs: TimeLog[] }> = {};
+        const weeks: Record<string, { totalHours: number, logs: TimeLog[], label: string, firstDate: string }> = {};
 
         activeLogs.forEach(log => {
             const d = new Date(log.date);
-            const { week, year } = getWeekNumber(d);
-            const key = `${year}-W${week}`;
+            const info = getWeekInfo(d);
+            const key = info.key;
 
-            if (!weeks[key]) weeks[key] = { totalHours: 0, logs: [] };
+            if (!weeks[key]) {
+                const startStr = formatDateFR(info.startDate);
+                const endStr = formatDateFR(info.endDate);
+                const fullLabel = info.isRelative
+                    ? `SEMAINE ${info.week} (DU ${startStr} AU ${endStr})`
+                    : `SEMAINE ${info.week} (DU ${startStr} AU ${endStr}) - ISO`;
+
+                weeks[key] = {
+                    totalHours: 0,
+                    logs: [],
+                    label: fullLabel,
+                    firstDate: log.date // fallback
+                };
+            }
             weeks[key].logs.push(log);
             weeks[key].totalHours += log.totalHours;
         });
 
-        return Object.entries(weeks).sort((a, b) => b[0].localeCompare(a[0]));
-    }, [activeLogs]);
+        // Sort keys. If relative (S1, S2), sort numerically. If ISO, string sort ok-ish but Year-Week better.
+        return Object.entries(weeks).sort((a, b) => {
+            // Determine sort logic based on key format
+            if (a[0].startsWith('S') && b[0].startsWith('S')) {
+                // S1 vs S10
+                const numA = parseInt(a[0].substring(1));
+                const numB = parseInt(b[0].substring(1));
+                return numB - numA; // Descending
+            }
+            return b[0].localeCompare(a[0]);
+        });
+    }, [activeLogs, project.shootingStartDate]); // updated dependency
 
     // Help format hours decimal to HhMM
     const formatHours = (decimalHours: number) => {
@@ -238,9 +317,10 @@ export const TimesheetWidget: React.FC = () => {
                 const lastName = log.userLastName || profile?.lastName || log.userName.split(' ').slice(1).join(' ');
                 const firstName = log.userFirstName || profile?.firstName || log.userName.split(' ')[0];
                 const role = log.userRole || profile?.role || '';
+                const dateFormatted = formatDateFR(log.date);
 
                 return [
-                    log.date,
+                    dateFormatted,
                     lastName,
                     firstName,
                     role,
@@ -266,10 +346,14 @@ export const TimesheetWidget: React.FC = () => {
             const totalHours = logs.reduce((acc, log) => acc + log.totalHours, 0);
             const formattedTotal = formatHours(totalHours);
             const firstDate = logs.length > 0 ? new Date(logs.sort((a, b) => a.date.localeCompare(b.date))[0].date) : new Date();
-            const dateStr = firstDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+            // Get week info for this export if available to show nice label?
+            const weekInfo = getWeekInfo(firstDate);
+            const weekLabel = weekInfo.isRelative
+                ? `Semaine ${weekInfo.week}`
+                : `Semaine du ${formatDateFR(weekInfo.startDate)}`;
 
             // Append explicit summary line at the bottom
-            csvContent += `\n\nTotal heures semaine du ${dateStr} : ${formattedTotal} heures`;
+            csvContent += `\n\nTotal heures ${weekLabel} : ${formattedTotal} heures`;
 
             const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
@@ -507,20 +591,19 @@ export const TimesheetWidget: React.FC = () => {
                     {/* Weekly Summary Tables */}
                     <div className="space-y-8">
                         {weeklyData.length > 0 ? weeklyData.map(([weekKey, data]) => (
-                            <div key={weekKey} className="bg-white text-slate-900 rounded-sm overflow-hidden shadow-xl">
-                                {/* Header styled like paper */}
-                                <div className="bg-slate-100 px-6 py-4 flex justify-between items-end border-b border-slate-300">
+                            <div key={weekKey} className="bg-cinema-800 text-slate-200 rounded-xl overflow-hidden border border-cinema-700 shadow-xl">
+                                {/* Header */}
+                                <div className="bg-cinema-900/50 px-6 py-4 flex justify-between items-end border-b border-cinema-700">
                                     <div>
-                                        <h3 className="font-bold text-xl text-slate-800 uppercase tracking-tight">{weekKey}</h3>
-                                        <div className="text-xs text-slate-500 font-mono mt-1">SEMAINE DU {new Date(data.logs[0].date).toLocaleDateString()}</div>
+                                        <h3 className="font-bold text-xl text-white uppercase tracking-tight">{data.label}</h3>
                                     </div>
                                     <div className="text-right">
                                         <div className="text-xs text-slate-500 uppercase font-bold">Total Hebdo</div>
-                                        <div className="text-2xl font-black text-slate-900 leading-none">{formatHours(data.totalHours)}</div>
+                                        <div className="text-2xl font-black text-white leading-none">{formatHours(data.totalHours)}</div>
                                         <button
                                             onClick={() => downloadCSV(data.logs, `Heures_Semaine_${weekKey}`)}
                                             disabled={isDownloading}
-                                            className="mt-2 text-[10px] font-bold uppercase tracking-wider text-blue-600 hover:text-blue-800 flex items-center justify-end gap-1 disabled:opacity-50"
+                                            className="mt-2 text-[10px] font-bold uppercase tracking-wider text-blue-400 hover:text-blue-300 flex items-center justify-end gap-1 disabled:opacity-50"
                                         >
                                             {isDownloading ? (
                                                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -535,7 +618,7 @@ export const TimesheetWidget: React.FC = () => {
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm whitespace-nowrap">
                                         <thead>
-                                            <tr className="bg-slate-50 border-b-2 border-slate-200 text-left text-slate-500 uppercase text-[10px] font-bold tracking-wider">
+                                            <tr className="bg-cinema-900/30 border-b border-cinema-700 text-left text-slate-500 uppercase text-[10px] font-bold tracking-wider">
                                                 <th className="px-4 py-3">Jour</th>
                                                 <th className="px-4 py-3">Début</th>
                                                 <th className="px-4 py-3">Repas</th>
@@ -545,22 +628,22 @@ export const TimesheetWidget: React.FC = () => {
                                                 <th className="px-4 py-3 text-center">Actions</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-slate-100">
+                                        <tbody className="divide-y divide-cinema-700/50">
                                             {data.logs
                                                 .sort((a, b) => a.date.localeCompare(b.date))
                                                 .map(log => (
-                                                    <tr key={log.id} className="hover:bg-blue-50/50 transition-colors">
-                                                        <td className="px-4 py-4 font-bold text-slate-700">
+                                                    <tr key={log.id} className="hover:bg-white/5 transition-colors">
+                                                        <td className="px-4 py-4 font-bold text-white">
                                                             {new Date(log.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })}
                                                         </td>
-                                                        <td className="px-4 py-4 text-slate-600 font-mono">{log.callTime}</td>
-                                                        <td className="px-4 py-4 text-slate-600 font-mono">
+                                                        <td className="px-4 py-4 text-slate-300 font-mono">{log.callTime}</td>
+                                                        <td className="px-4 py-4 text-slate-300 font-mono">
                                                             {log.mealTime || '-'}
                                                         </td>
-                                                        <td className="px-4 py-4 text-slate-500 text-xs text-center">
+                                                        <td className="px-4 py-4 text-slate-400 text-xs text-center">
                                                             <div className="flex flex-col gap-1 items-center">
                                                                 {log.isContinuousDay && (
-                                                                    <span className="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-bold uppercase">Journée Continue</span>
+                                                                    <span className="text-[10px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded font-bold uppercase border border-blue-500/30">Journée Continue</span>
                                                                 )}
                                                                 {!log.isContinuousDay && (
                                                                     <span>{log.hasShortenedMeal ? 'Repas -30m' : 'Repas -1h'}</span>
@@ -574,22 +657,21 @@ export const TimesheetWidget: React.FC = () => {
                                                                 )}
                                                                 {log.note && (
                                                                     <div className="group relative">
-                                                                        <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded border border-yellow-200 cursor-help max-w-[150px] truncate block">
+                                                                        <span className="text-[10px] bg-yellow-500/10 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/20 cursor-help max-w-[150px] truncate block">
                                                                             Note : {log.note}
                                                                         </span>
-                                                                        {/* Tooltip on hover if needed, or just let truncate handle it */}
                                                                     </div>
                                                                 )}
                                                             </div>
                                                         </td>
-                                                        <td className="px-4 py-4 text-slate-600 font-mono">{log.endTime}</td>
-                                                        <td className="px-4 py-4 text-right font-bold text-slate-800 bg-slate-50/50">{formatHours(log.totalHours)}</td>
+                                                        <td className="px-4 py-4 text-slate-300 font-mono">{log.endTime}</td>
+                                                        <td className="px-4 py-4 text-right font-bold text-white bg-cinema-900/30">{formatHours(log.totalHours)}</td>
                                                         <td className="px-4 py-4 text-center">
                                                             <div className="flex justify-center items-center gap-2">
                                                                 <button
                                                                     onClick={() => downloadCSV([log], `Heures_${log.userName}_${log.date}`)}
                                                                     disabled={isDownloading}
-                                                                    className="text-slate-400 hover:text-blue-500 p-1 rounded transition-colors disabled:opacity-50"
+                                                                    className="text-slate-500 hover:text-blue-400 p-1 rounded transition-colors disabled:opacity-50"
                                                                     title="Télécharger CSV"
                                                                 >
                                                                     {isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
@@ -598,7 +680,7 @@ export const TimesheetWidget: React.FC = () => {
                                                                 {viewMode === 'personal' && (
                                                                     <button
                                                                         onClick={() => handleDeleteLog(log.id)}
-                                                                        className="text-slate-400 hover:text-red-500 p-1 rounded transition-colors"
+                                                                        className="text-slate-500 hover:text-red-400 p-1 rounded transition-colors"
                                                                         title="Supprimer"
                                                                     >
                                                                         <Trash2 className="h-4 w-4" />
@@ -609,10 +691,10 @@ export const TimesheetWidget: React.FC = () => {
                                                     </tr>
                                                 ))}
                                         </tbody>
-                                        <tfoot className="bg-slate-50 border-t border-slate-200">
+                                        <tfoot className="bg-cinema-900/30 border-t border-cinema-700">
                                             <tr>
                                                 <td colSpan={5} className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">Total Semaine</td>
-                                                <td className="px-4 py-3 text-right font-black text-slate-900 border-l border-slate-200">{formatHours(data.totalHours)}</td>
+                                                <td className="px-4 py-3 text-right font-black text-white border-l border-cinema-700">{formatHours(data.totalHours)}</td>
                                                 <td></td>
                                             </tr>
                                         </tfoot>

@@ -123,63 +123,123 @@ export const CateringWidget: React.FC = () => {
     // View Mode for Production
     const [viewMode, setViewMode] = useState<'daily' | 'weekly'>('daily');
 
-    // Helper: Get ISO Week
-    const getWeekNumber = (d: Date) => {
+    // Helper: Format Date DD/MM/YYYY
+    const formatDateFR = (dateStr: string | Date) => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    };
+
+    // Helper: Get Week Number (Relative to Shooting Start or ISO)
+    const getWeekInfo = (d: Date) => {
+        // 1. Try Relative to Shooting Start
+        if (project.shootingStartDate) {
+            const start = new Date(project.shootingStartDate);
+            // Reset times to midnight for accurate day diff
+            const target = new Date(d);
+            target.setHours(0, 0, 0, 0);
+            start.setHours(0, 0, 0, 0);
+
+            // Calculate diff in days
+            const diffTime = target.getTime() - start.getTime();
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+            // If date is before start date, maybe use Pre-Prod weeks? Or just negative?
+            // For now let's handle "Week 1" as days 0-6.
+            const weekNum = Math.floor(diffDays / 7) + 1;
+
+            // Calculate start/end of this relative week
+            const weekStart = new Date(start);
+            weekStart.setDate(start.getDate() + (weekNum - 1) * 7);
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
+
+            return {
+                week: weekNum,
+                year: weekStart.getFullYear(), // Just for grouping key mostly
+                label: `Semaine ${weekNum}`,
+                startDate: weekStart,
+                endDate: weekEnd,
+                isRelative: true,
+                key: `S${weekNum}` // Simple key
+            };
+        }
+
+        // 2. Fallback to ISO Week
         d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
         d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
         const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
         const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-        return { week: weekNo, year: d.getUTCFullYear() };
-    };
 
-    const getWeekLabel = (weekStr: string) => {
-        const [year, week] = weekStr.split('-').map(Number);
-
-        // Calculate Monday of the ISO week
-        const simple = new Date(Date.UTC(year, 0, 1 + (week - 1) * 7));
+        // Calculate ISO Week dates (approx)
+        const simple = new Date(Date.UTC(d.getUTCFullYear(), 0, 1 + (weekNo - 1) * 7));
         const dow = simple.getUTCDay();
         const monday = simple;
-        if (dow <= 4)
-            monday.setUTCDate(simple.getUTCDate() - simple.getUTCDay() + 1);
-        else
-            monday.setUTCDate(simple.getUTCDate() + 8 - simple.getUTCDay());
-
-        // Sunday is Monday + 6 days
+        if (dow <= 4) monday.setUTCDate(simple.getUTCDate() - simple.getUTCDay() + 1);
+        else monday.setUTCDate(simple.getUTCDate() + 8 - simple.getUTCDay());
         const sunday = new Date(monday);
         sunday.setUTCDate(monday.getUTCDate() + 6);
 
-        const formatDate = (d: Date) => {
-            return `${d.getUTCDate().toString().padStart(2, '0')}/${(d.getUTCMonth() + 1).toString().padStart(2, '0')}`;
+        return {
+            week: weekNo,
+            year: d.getUTCFullYear(),
+            label: `Semaine ${weekNo} (ISO)`,
+            startDate: monday,
+            endDate: sunday,
+            isRelative: false,
+            key: `${d.getUTCFullYear()}-${weekNo}`
         };
-
-        return `Semaine du ${formatDate(monday)} au ${formatDate(sunday)}`;
     };
 
     // Weekly Stats Calculation
     const weeklyStats = useMemo(() => {
         if (!project.cateringLogs) return [];
 
-        const weeks: Record<string, { total: number, veggie: number, firstDate: string }> = {};
+        const weeks: Record<string, { total: number, veggie: number, label: string, firstDate: string }> = {};
 
         project.cateringLogs.forEach(log => {
             if (!log.hasEaten) return;
             const date = new Date(log.date);
-            const { week, year } = getWeekNumber(date);
-            const key = `${year}-${week}`;
+            const info = getWeekInfo(date);
 
-            if (!weeks[key]) weeks[key] = { total: 0, veggie: 0, firstDate: log.date };
+            // If relative, key is S1, S2... If ISO, key is 2023-45
+            const key = info.key;
+
+            if (!weeks[key]) {
+                const startStr = formatDateFR(info.startDate);
+                const endStr = formatDateFR(info.endDate);
+                const fullLabel = info.isRelative
+                    ? `Semaine ${info.week} (du ${startStr} au ${endStr})`
+                    : `Semaine ${info.week} (du ${startStr} au ${endStr})`;
+
+                weeks[key] = {
+                    total: 0,
+                    veggie: 0,
+                    firstDate: log.date,
+                    label: fullLabel
+                };
+            }
             weeks[key].total++;
             if (log.isVegetarian) weeks[key].veggie++;
         });
 
+        // Sort keys. If relative (S1, S2), sort numerically. If ISO, string sort ok-ish but Year-Week better.
         return Object.entries(weeks)
-            .sort((a, b) => b[0].localeCompare(a[0])) // Descending (newest first)
+            .sort((a, b) => {
+                // Determine sort logic based on key format
+                if (a[0].startsWith('S') && b[0].startsWith('S')) {
+                    // S1 vs S10
+                    const numA = parseInt(a[0].substring(1));
+                    const numB = parseInt(b[0].substring(1));
+                    return numB - numA; // Descending
+                }
+                return b[0].localeCompare(a[0]);
+            })
             .map(([key, data]) => ({
                 key,
-                label: getWeekLabel(key),
                 ...data
             }));
-    }, [project.cateringLogs]);
+    }, [project.cateringLogs, project.shootingStartDate]); // Re-calc if start date changes
 
     // Summary Calculations (Daily)
     const stats = useMemo(() => {
@@ -188,12 +248,12 @@ export const CateringWidget: React.FC = () => {
         const byDept: Record<string, { total: number, veggie: number }> = {};
 
         dailyLogs.filter(l => l.hasEaten).forEach(log => {
-            if (!byDept[log.department]) byDept[log.department] = { total: 0, veggie: 0 };
-            byDept[log.department].total++;
-            if (log.isVegetarian) byDept[log.department].veggie++;
+            const dept = log.department || 'Autre';
+            if (!byDept[dept]) byDept[dept] = { total: 0, veggie: 0 };
+            byDept[dept].total++;
+            if (log.isVegetarian) byDept[dept].veggie++;
         });
 
-        return { total, veggie, byDept };
         return { total, veggie, byDept };
     }, [dailyLogs]);
 
@@ -208,7 +268,7 @@ export const CateringWidget: React.FC = () => {
             if (isWeeklyLog) {
                 // Raw Log (Weekly)
                 const log = row as CateringLog;
-                date = log.date;
+                date = formatDateFR(log.date);
                 name = log.guestName || (log.userId ? userProfiles.find(u => u.email === log.userId)?.firstName + ' ' + userProfiles.find(u => u.email === log.userId)?.lastName : 'Inconnu');
                 dept = log.department;
                 // Lookup role if user
@@ -219,7 +279,7 @@ export const CateringWidget: React.FC = () => {
                 isVeg = log.isVegetarian ? 'OUI' : 'NON';
             } else {
                 // Table Row (Daily)
-                date = selectedDate;
+                date = formatDateFR(selectedDate);
                 name = row.name;
                 dept = row.department;
                 role = row.role || '';
@@ -263,12 +323,21 @@ export const CateringWidget: React.FC = () => {
         if (sortedDates.length === 0) return alert("Aucune donnée pour cette semaine.");
 
         const startDate = sortedDates[0];
-        const endDate = sortedDates[sortedDates.length - 1];
+        const endDate = sortedDates[sortedDates.length - 1]; // Use actual data range for header text? Or calculated week?
+        // Let's use formatted dates from the first/last log for the filename logic or header
+
+        // Better: Use `getWeekInfo` on one of the dates to get the theoretical week range?
+        // Let's stick to actual data range for prompt message, but consistent week label.
+
         const weeklyTotal = logsForWeek.length;
         const weeklyVeggie = logsForWeek.filter(l => l.isVegetarian).length;
 
+        // Find week info for header
+        const weekInfo = getWeekInfo(new Date(startDate));
+        const weekLabelFull = `SEMAINE ${weekInfo.week} (Du ${formatDateFR(weekInfo.startDate)} au ${formatDateFR(weekInfo.endDate)})`;
+
         // 3. Build CSV Content
-        let csv = `RAPPORT CANTINE - SEMAINE DU ${startDate.split('-').reverse().join('/')} AU ${endDate.split('-').reverse().join('/')}\n`;
+        let csv = `RAPPORT CANTINE - ${weekLabelFull}\n`;
         csv += `TOTAL SEMAINE: ${weeklyTotal} repas (Dont Végé: ${weeklyVeggie})\n\n`;
 
         // Columns Header
@@ -289,7 +358,7 @@ export const CateringWidget: React.FC = () => {
             });
 
             // Day Header
-            csv += `JOURNÉE DU ${date.split('-').reverse().join('/')} (Total: ${dayTotal} - Végé: ${dayVeggie})\n`;
+            csv += `JOURNÉE DU ${formatDateFR(date)} (Total: ${dayTotal} - Végé: ${dayVeggie})\n`;
             csv += `${cols}\n`;
 
             // Rows
@@ -303,7 +372,7 @@ export const CateringWidget: React.FC = () => {
                 const hasEaten = log.hasEaten ? 'OUI' : 'NON';
                 const isVeg = log.isVegetarian ? 'OUI' : 'NON';
 
-                csv += `${date},"${name}",${dept},"${role}",${diet},${hasEaten},${isVeg}\n`;
+                csv += `${formatDateFR(date)},"${name}",${dept},"${role}",${diet},${hasEaten},${isVeg}\n`;
             });
 
             csv += `\n`; // Spacer between days
@@ -315,7 +384,7 @@ export const CateringWidget: React.FC = () => {
         if (link.download !== undefined) {
             const url = URL.createObjectURL(blob);
             link.setAttribute('href', url);
-            link.setAttribute('download', `Rapport_Cantine_Semaine_${weekKey}.csv`);
+            link.setAttribute('download', `Rapport_Cantine_Semaine_${weekInfo.week}.csv`);
             link.style.visibility = 'hidden';
             document.body.appendChild(link);
             link.click();
@@ -461,10 +530,11 @@ export const CateringWidget: React.FC = () => {
                                                     onClick={() => {
                                                         // Filter logs for this week
                                                         const logsForWeek = (project.cateringLogs || []).filter(l => {
-                                                            if (!l.hasEaten) return false; // Only export EATEN meals for the report? User said "Feuilles Cantine", implies list of meals.
+                                                            if (!l.hasEaten) return false;
                                                             const d = new Date(l.date);
-                                                            const { week: w, year: y } = getWeekNumber(d);
-                                                            return `${y}-${w}` === week.key;
+                                                            const info = getWeekInfo(d);
+                                                            // Match by key (S1, S2... or 2023-45)
+                                                            return info.key === week.key;
                                                         });
                                                         downloadWeeklyReport(week.key, logsForWeek);
                                                     }}
@@ -498,9 +568,99 @@ export const CateringWidget: React.FC = () => {
                 </div>
             ) : (
                 <>
-                    {/* Production Summary View (Daily) */}
+
+                    {/* Main Table (Daily) */}
+                    <div className="bg-cinema-800 rounded-xl border border-cinema-700 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead>
+                                    <tr className="bg-cinema-900/50 border-b border-cinema-700 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                        <th className="px-2 py-3 md:px-6 md:py-4">Nom</th>
+                                        <th className="px-2 py-3 md:px-6 md:py-4 text-center">
+                                            <span className="md:hidden">Manger</span>
+                                            <span className="hidden md:inline">A Mangé ?</span>
+                                        </th>
+                                        <th className="px-2 py-3 md:px-6 md:py-4 text-center">
+                                            <span className="md:hidden">Végé</span>
+                                            <span className="hidden md:inline">Végétarien ?</span>
+                                        </th>
+                                        <th className="px-2 py-3 md:px-6 md:py-4">Régime</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-cinema-700">
+                                    {/* Group by Department */}
+                                    {Object.entries(
+                                        tableData.reduce((acc, row) => {
+                                            const dept = row.department || 'Autre';
+                                            if (!acc[dept]) acc[dept] = [];
+                                            acc[dept].push(row);
+                                            return acc;
+                                        }, {} as Record<string, typeof tableData>)
+                                    ).sort((a, b) => a[0].localeCompare(b[0])).map(([dept, rows]) => (
+                                        <React.Fragment key={dept}>
+                                            {/* Department Header */}
+                                            <tr className="bg-cinema-900/80 border-b border-cinema-700">
+                                                <td colSpan={4} className="px-2 py-2 md:px-6 md:py-3 text-eco-400 font-bold uppercase tracking-wider text-xs md:text-sm">
+                                                    {dept} <span className="text-slate-500 text-[10px] md:text-xs ml-2">({rows.length} pers.)</span>
+                                                </td>
+                                            </tr>
+                                            {/* Rows for this Department */}
+                                            {rows.map((row) => (
+                                                <tr key={row.id} className="hover:bg-cinema-700/30 transition-colors">
+                                                    <td className="px-2 py-3 md:px-6 md:py-4">
+                                                        <div className="font-bold text-white flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
+                                                            <span className="truncate max-w-[150px] md:max-w-none">{row.name}</span>
+                                                            <div className="text-[10px] md:text-xs text-slate-500 truncate max-w-[100px] md:max-w-none hidden sm:block">
+                                                                {row.role}
+                                                            </div>
+                                                            {row.isManual && <span className="text-[8px] md:text-[10px] bg-blue-900/50 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/30 inline-block w-fit">INVITÉ</span>}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-2 py-3 md:px-6 md:py-4 text-center">
+                                                        <button
+                                                            onClick={() => handleToggleMeal(row, 'hasEaten')}
+                                                            disabled={!isRegie}
+                                                            className={`p-1.5 md:p-2 rounded-lg transition-all ${row.hasEaten
+                                                                ? 'bg-green-600 text-white shadow-lg shadow-green-600/20 md:scale-110'
+                                                                : 'bg-cinema-900 text-slate-600 hover:bg-cinema-700'
+                                                                } ${!isRegie && 'opacity-50 cursor-not-allowed'}`}
+                                                        >
+                                                            <Check className="h-4 w-4 md:h-5 md:w-5" />
+                                                        </button>
+                                                    </td>
+                                                    <td className="px-2 py-3 md:px-6 md:py-4 text-center">
+                                                        <button
+                                                            onClick={() => handleToggleMeal(row, 'isVegetarian')}
+                                                            disabled={!isRegie}
+                                                            className={`p-1.5 md:p-2 rounded-lg transition-all ${row.isVegetarian
+                                                                ? 'bg-eco-600 text-white shadow-lg shadow-eco-600/20'
+                                                                : 'bg-cinema-900 text-slate-600 hover:bg-cinema-700'
+                                                                } ${!isRegie && 'opacity-50 cursor-not-allowed'}`}
+                                                        >
+                                                            <Leaf className="h-4 w-4 md:h-5 md:w-5" />
+                                                        </button>
+                                                    </td>
+                                                    <td className="px-2 py-3 md:px-6 md:py-4">
+                                                        {row.diet !== 'Standard' ? (
+                                                            <span className="text-[10px] md:text-xs font-bold bg-purple-900/50 text-purple-400 px-1.5 py-0.5 md:px-2 md:py-1 rounded border border-purple-500/30 whitespace-nowrap">
+                                                                {row.diet === 'Végétarien' ? 'Végé' : row.diet}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[10px] md:text-xs text-slate-600">Std</span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </React.Fragment>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Production Summary View (Daily) - Moved to Bottom */}
                     {isProduction && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
                             {Object.entries(stats.byDept).map(([dept, count]) => (
                                 <div key={dept} className="bg-cinema-800 p-4 rounded-xl border border-cinema-700">
                                     <h4 className="text-sm font-bold text-slate-300 mb-2">{dept}</h4>
@@ -514,81 +674,6 @@ export const CateringWidget: React.FC = () => {
                             ))}
                         </div>
                     )}
-
-                    {/* Main Table (Daily) */}
-                    <div className="bg-cinema-800 rounded-xl border border-cinema-700 overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead>
-                                    <tr className="bg-cinema-900/50 border-b border-cinema-700 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">
-                                        <th className="px-2 py-3 md:px-6 md:py-4">Nom</th>
-                                        <th className="px-2 py-3 md:px-6 md:py-4">
-                                            <span className="md:hidden">Dpt</span>
-                                            <span className="hidden md:inline">Département & Fonction</span>
-                                        </th>
-                                        <th className="px-2 py-3 md:px-6 md:py-4">Régime</th>
-                                        <th className="px-2 py-3 md:px-6 md:py-4 text-center">
-                                            <span className="md:hidden">Manger</span>
-                                            <span className="hidden md:inline">A Mangé ?</span>
-                                        </th>
-                                        <th className="px-2 py-3 md:px-6 md:py-4 text-center">
-                                            <span className="md:hidden">Végé</span>
-                                            <span className="hidden md:inline">Végétarien ?</span>
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-cinema-700">
-                                    {tableData.map((row) => (
-                                        <tr key={row.id} className="hover:bg-cinema-700/30 transition-colors">
-                                            <td className="px-2 py-3 md:px-6 md:py-4">
-                                                <div className="font-bold text-white flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
-                                                    <span className="truncate max-w-[100px] md:max-w-none">{row.name}</span>
-                                                    {row.isManual && <span className="text-[8px] md:text-[10px] bg-blue-900/50 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/30 inline-block w-fit">INVITÉ</span>}
-                                                </div>
-                                            </td>
-                                            <td className="px-2 py-3 md:px-6 md:py-4">
-                                                <div className="text-xs md:text-sm text-white truncate max-w-[80px] md:max-w-none">{row.department}</div>
-                                                <div className="text-[10px] md:text-xs text-slate-500 truncate max-w-[80px] md:max-w-none hidden sm:block">{row.role}</div>
-                                            </td>
-                                            <td className="px-2 py-3 md:px-6 md:py-4">
-                                                {row.diet !== 'Standard' ? (
-                                                    <span className="text-[10px] md:text-xs font-bold bg-purple-900/50 text-purple-400 px-1.5 py-0.5 md:px-2 md:py-1 rounded border border-purple-500/30 whitespace-nowrap">
-                                                        {row.diet === 'Végétarien' ? 'Végé' : row.diet}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-[10px] md:text-xs text-slate-600">Std</span>
-                                                )}
-                                            </td>
-                                            <td className="px-2 py-3 md:px-6 md:py-4 text-center">
-                                                <button
-                                                    onClick={() => handleToggleMeal(row, 'hasEaten')}
-                                                    disabled={!isRegie}
-                                                    className={`p-1.5 md:p-2 rounded-lg transition-all ${row.hasEaten
-                                                        ? 'bg-green-600 text-white shadow-lg shadow-green-600/20 md:scale-110'
-                                                        : 'bg-cinema-900 text-slate-600 hover:bg-cinema-700'
-                                                        } ${!isRegie && 'opacity-50 cursor-not-allowed'}`}
-                                                >
-                                                    <Check className="h-4 w-4 md:h-5 md:w-5" />
-                                                </button>
-                                            </td>
-                                            <td className="px-2 py-3 md:px-6 md:py-4 text-center">
-                                                <button
-                                                    onClick={() => handleToggleMeal(row, 'isVegetarian')}
-                                                    disabled={!isRegie}
-                                                    className={`p-1.5 md:p-2 rounded-lg transition-all ${row.isVegetarian
-                                                        ? 'bg-eco-600 text-white shadow-lg shadow-eco-600/20'
-                                                        : 'bg-cinema-900 text-slate-600 hover:bg-cinema-700'
-                                                        } ${!isRegie && 'opacity-50 cursor-not-allowed'}`}
-                                                >
-                                                    <Leaf className="h-4 w-4 md:h-5 md:w-5" />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
                 </>
             )}
 

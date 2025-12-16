@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Department, SurplusAction } from '../types';
-import { Users, ShoppingBag, MessageSquare, FileText, Receipt, Utensils, Clock, Truck } from 'lucide-react';
+import { Users, ShoppingBag, MessageSquare, FileText, Receipt, Utensils, Clock, Truck, GripHorizontal } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 import { DndContext, closestCenter, TouchSensor, MouseSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -18,7 +18,16 @@ const SortableWidget = ({ id, children }: { id: string, children: React.ReactNod
         height: '100%'
     };
     return (
-        <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="touch-none select-none h-full">
+        <div ref={setNodeRef} style={style} className="h-full relative group/widget">
+            {/* Visual Drag Handle - NOW ACTS AS THE TRIGGER */}
+            <div
+                {...attributes}
+                {...listeners}
+                className="absolute top-2 left-1/2 -translate-x-1/2 z-20 text-white/50 bg-black/20 rounded-full px-4 py-1 cursor-grab active:cursor-grabbing touch-none hover:bg-black/40 transition-colors"
+                title="Déplacer le widget"
+            >
+                <GripHorizontal className="h-4 w-4" />
+            </div>
             {children}
         </div>
     );

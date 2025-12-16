@@ -22,7 +22,7 @@ import { ProjectSelection } from './components/ProjectSelection';
 import { AdminDashboard } from './components/AdminDashboard';
 import { FallbackErrorBoundary } from './components/FallbackErrorBoundary';
 import { DebugFooter } from './components/DebugFooter';
-import { Bell, LogOut, User as UserIcon, Menu, Calendar, X, Check } from 'lucide-react';
+import { Bell, LogOut, User as UserIcon, Menu, Calendar, X, Check, Trash2 } from 'lucide-react';
 import { Department } from './types';
 
 const AppContent: React.FC = () => {
@@ -39,6 +39,7 @@ const AppContent: React.FC = () => {
     unreadNotificationCount,
     notifications, // Added
     markAsRead, // Added
+    deleteNotification, // Added
     markAllAsRead, // Added
     logout,
     t,
@@ -75,6 +76,8 @@ const AppContent: React.FC = () => {
       setActiveTab('expenses');
     } else if (msg.includes('social') || n.itemId?.startsWith('post_')) { // Assuming social notifs use this type
       setActiveTab('social');
+    } else if (msg.includes('vendre') || msg.includes('vente') || msg.includes('transaction')) {
+      setActiveTab('buyback');
     } else {
       // Default fallback
       setActiveTab('renforts');
@@ -335,21 +338,37 @@ const AppContent: React.FC = () => {
                     ) : (
                       <div className="divide-y divide-cinema-700/50">
                         {displayNotifications.map((n: any) => (
-                          <button
+                          <div
                             key={n.id}
-                            onClick={() => handleNotificationClick(n)}
-                            className={`w-full text-left p-3 hover:bg-white/5 transition-colors flex gap-3 ${!n.read ? 'bg-blue-500/5' : ''}`}
+                            className={`w-full flex items-start gap-3 p-3 hover:bg-white/5 transition-colors border-b border-cinema-700/50 last:border-0 ${!n.read ? 'bg-blue-500/5' : ''}`}
                           >
-                            <div className={`mt-0.5 h-2 w-2 rounded-full shrink-0 ${!n.read ? 'bg-blue-500' : 'bg-transparent'}`} />
-                            <div className="flex-1 min-w-0">
-                              <p className={`text-sm ${!n.read ? 'text-white font-medium' : 'text-slate-400'}`}>
-                                {n.message}
-                              </p>
-                              <p className="text-[10px] text-slate-500 mt-1">
-                                {new Date(n.date).toLocaleDateString()}
-                              </p>
-                            </div>
-                          </button>
+                            <button
+                              onClick={() => handleNotificationClick(n)}
+                              className="flex-1 text-left flex gap-3 min-w-0"
+                            >
+                              <div className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${!n.read ? 'bg-blue-500' : 'bg-transparent'}`} />
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-sm ${!n.read ? 'text-white font-medium' : 'text-slate-400'}`}>
+                                  {n.message}
+                                </p>
+                                <p className="text-[10px] text-slate-500 mt-1">
+                                  {new Date(n.date).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </button>
+
+                            {/* Delete Button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteNotification(n.id);
+                              }}
+                              className="p-1 text-slate-500 hover:text-red-400 transition-colors opacity-50 hover:opacity-100"
+                              title="Supprimer la notification"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
                         ))}
                       </div>
                     )}
