@@ -376,7 +376,7 @@ export const ExpenseReports: React.FC = () => {
                                                         <div className="bg-cinema-900/50 p-3 pl-12 space-y-3 border-t border-cinema-700/30">
                                                             <div className="flex justify-end">
                                                                 <button
-                                                                    onClick={(e) => { e.stopPropagation(); generateSummaryPDF(userReports, userName, dept); }}
+                                                                    onClick={async (e) => { e.stopPropagation(); await generateSummaryPDF(userReports, userName, dept); }}
                                                                     className="flex items-center gap-2 text-xs bg-cinema-800 hover:bg-cinema-700 text-white px-3 py-1.5 rounded border border-cinema-600 transition-colors"
                                                                 >
                                                                     <FileText className="h-3 w-3" />

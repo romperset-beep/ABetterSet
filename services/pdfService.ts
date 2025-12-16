@@ -113,7 +113,7 @@ export const generateExpenseReportPDF = async (report: ExpenseReport) => {
     doc.save(`Frais_${report.date.split('T')[0]}_${report.merchantName?.replace(/[^a-z0-9]/gi, '_')}.pdf`);
 };
 
-export const generateSummaryPDF = (reports: ExpenseReport[], userName: string, department: string) => {
+export const generateSummaryPDF = async (reports: ExpenseReport[], userName: string, department: string) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
 
@@ -194,6 +194,53 @@ export const generateSummaryPDF = (reports: ExpenseReport[], userName: string, d
     if (totalPending > 0) {
         // Aligned right
         doc.text(`dont ${totalPending.toFixed(2)} € en attente de validation`, pageWidth - 20, y, { align: 'right' });
+    }
+
+    // -- Append Receipts --
+    for (const report of reports) {
+        if (report.receiptBase64 || report.receiptUrl) {
+            try {
+                doc.addPage();
+                doc.setFontSize(14);
+                doc.setTextColor(0, 0, 0);
+                doc.text(`Justificatif : ${report.merchantName} (${new Date(report.date).toLocaleDateString('fr-FR')})`, 20, 20);
+                doc.setFontSize(10);
+                if (report.receiptUrl) {
+                    doc.setTextColor(0, 0, 255);
+                    doc.textWithLink('Ouvrir l\'original', 20, 26, { url: report.receiptUrl });
+                }
+
+                let base64data = report.receiptBase64;
+
+                // Fallback fetch if only URL
+                if (!base64data && report.receiptUrl) {
+                    const fetchUrl = `${report.receiptUrl}${report.receiptUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+                    const response = await fetch(fetchUrl, { mode: 'cors' });
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        const reader = new FileReader();
+                        base64data = await new Promise<string>((resolve) => {
+                            reader.onloadend = () => resolve(reader.result as string);
+                            reader.onerror = () => resolve(''); // Safe fail
+                            reader.readAsDataURL(blob);
+                        });
+                    }
+                }
+
+                if (base64data) {
+                    const imgProps = doc.getImageProperties(base64data);
+                    const pdfWidth = doc.internal.pageSize.getWidth() - 40;
+                    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                    // Cap height to fit page
+                    const maxHeight = doc.internal.pageSize.getHeight() - 40;
+                    const finalHeight = Math.min(pdfHeight, maxHeight);
+
+                    doc.addImage(base64data, 'JPEG', 20, 35, pdfWidth, finalHeight);
+                }
+            } catch (e) {
+                console.warn(`Could not embed receipt for ${report.id}`, e);
+            }
+        }
     }
 
     doc.save(`Recap_Frais_${userName}.pdf`);
