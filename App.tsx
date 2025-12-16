@@ -106,6 +106,10 @@ const AppContent: React.FC = () => {
     } else if (msg.includes('feuille de service') || msg.includes('call sheet')) {
       setActiveTab('callsheets');
 
+      // 8. Circular Economy / Donations
+    } else if (msg.includes('surplus') || msg.includes('don') || msg.includes('recyclage') || msg.includes('réemploi')) {
+      setActiveTab('circular');
+
     } else {
       // Default fallback (Dashboard or stay)
       // setActiveTab('dashboard'); // Safer default?
