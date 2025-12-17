@@ -41,42 +41,69 @@ export const RenfortsWidget: React.FC = () => {
     const [prodExpandedDepts, setProdExpandedDepts] = useState<string[]>([]); // 'YYYY-MM-DD_DEPT'
     const [viewMode, setViewMode] = useState<'OVERVIEW' | 'MY_TEAM'>('OVERVIEW');
 
-    // Helper to get ISO Week
-    const getISOWeek = (d: Date) => {
+    // Helper: Get Week Info (Relative to Shooting Start or ISO)
+    const getWeekInfo = (d: Date) => {
+        // 1. Try Relative to Shooting Start
+        if (project.shootingStartDate) {
+            const start = new Date(project.shootingStartDate);
+            const target = new Date(d);
+            target.setHours(0, 0, 0, 0);
+            start.setHours(0, 0, 0, 0);
+
+            const diffTime = target.getTime() - start.getTime();
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            const weekNum = Math.floor(diffDays / 7) + 1;
+
+            const weekStart = new Date(start);
+            weekStart.setDate(start.getDate() + (weekNum - 1) * 7);
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
+
+            return {
+                week: weekNum,
+                label: `Semaine ${weekNum} (${weekStart.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} - ${weekEnd.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })})`,
+                key: `S${weekNum}`
+            };
+        }
+
+        // 2. Fallback to ISO Week
         d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
         d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
         const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
         const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-        return { year: d.getUTCFullYear(), week: weekNo };
+
+        // Calculate ISO Week dates
+        const simple = new Date(Date.UTC(d.getUTCFullYear(), 0, 1 + (weekNo - 1) * 7));
+        const dow = simple.getUTCDay();
+        const monday = simple;
+        if (dow <= 4) monday.setUTCDate(simple.getUTCDate() - simple.getUTCDay() + 1);
+        else monday.setUTCDate(simple.getUTCDate() + 8 - simple.getUTCDay());
+        const sunday = new Date(monday);
+        sunday.setUTCDate(monday.getUTCDate() + 6);
+
+        return {
+            week: weekNo,
+            label: `Semaine ${weekNo} (${monday.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} - ${sunday.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })})`,
+            key: `${d.getUTCFullYear()}-${weekNo}`
+        };
     };
 
     const groupedByWeek = useMemo(() => {
-        const groups: Record<string, { label: string, count: number, start: Date, end: Date, days: string[] }> = {};
+        const groups: Record<string, { label: string, count: number, days: string[] }> = {};
 
         // Find range of existing reinforcements
         const allDates = (project.reinforcements || []).map(r => r.date).sort();
         if (allDates.length === 0) return {};
 
-        // Populate weeks based on actual data
+        // Populate weeks
         (project.reinforcements || []).forEach(r => {
             const d = new Date(r.date);
-            const { year, week } = getISOWeek(d);
-            const key = `${year} -W${week} `;
+            const { key, label } = getWeekInfo(d);
 
             if (!groups[key]) {
-                // Calculate start of week (Monday)
-                const simple = new Date(d);
-                const day = simple.getDay();
-                const diff = simple.getDate() - day + (day === 0 ? -6 : 1);
-                const start = new Date(simple.setDate(diff));
-                const end = new Date(start);
-                end.setDate(end.getDate() + 6);
-
                 groups[key] = {
-                    label: `Semaine ${week} (${start.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} - ${end.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })})`,
+                    label,
                     count: 0,
-                    start,
-                    end,
                     days: []
                 };
             }
@@ -86,7 +113,7 @@ export const RenfortsWidget: React.FC = () => {
         });
 
         return groups;
-    }, [project.reinforcements]);
+    }, [project.reinforcements, project.shootingStartDate]);
 
     // Helpers for production actions
     const toggleProdDay = (dateStr: string) => {
