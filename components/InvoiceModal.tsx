@@ -7,10 +7,11 @@ interface InvoiceModalProps {
     isOpen: boolean;
     onClose: () => void;
     item: BuyBackItem | null;
-    filmTitle: string;
+    sellerName: string;
+    buyerName: string;
 }
 
-export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, item, filmTitle }) => {
+export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, item, sellerName, buyerName }) => {
     const [vatRate, setVatRate] = useState(20);
 
     if (!isOpen || !item) return null;
@@ -42,7 +43,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, ite
 
         doc.setFontSize(11);
         doc.setTextColor(60);
-        doc.text(`Film: ${filmTitle}`, 20, 60);
+        doc.text(`Film: ${sellerName}`, 20, 60);
 
         // Transaction Info
         doc.setFontSize(14);
@@ -52,9 +53,10 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, ite
         doc.setFontSize(11);
         doc.setTextColor(60);
         // User Request: 'vendu par (le nom de la production )'
-        doc.text(`Vendu par: ${filmTitle}`, 20, 90);
+        // User Request: 'vendu par (le nom de la production )'
+        doc.text(`Vendu par: ${sellerName}`, 20, 90);
         // User Request: 'à : (le prenom et le nom de la personne qui à réservé l'article )'
-        doc.text(`À: ${item.reservedByName || item.reservedBy || 'Non spécifié'}`, 20, 96);
+        doc.text(`À: ${buyerName}`, 20, 96);
 
         // Table Header
         let y = 110;
@@ -108,7 +110,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, ite
                             <FileText className="h-5 w-5 text-slate-500" />
                             Édition de Facture
                         </h2>
-                        <p className="text-sm text-slate-500">{filmTitle}</p>
+                        <p className="text-sm text-slate-500">{sellerName}</p>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
                         <X className="h-5 w-5 text-slate-500" />
@@ -119,7 +121,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, ite
                     <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                         <h3 className="font-bold text-lg mb-1">{item.name}</h3>
                         <p className="text-sm text-slate-500">
-                            Vendu par <span className="font-medium text-slate-700">{filmTitle}</span> à <span className="font-medium text-slate-700">{item.reservedByName || item.reservedBy || 'Inconnu'}</span>
+                            Vendu par <span className="font-medium text-slate-700">{sellerName}</span> à <span className="font-medium text-slate-700">{buyerName}</span>
                         </p>
                     </div>
 

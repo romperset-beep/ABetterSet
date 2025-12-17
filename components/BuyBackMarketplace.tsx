@@ -7,7 +7,7 @@ import { SalesHistoryModal } from './SalesHistoryModal';
 import { InvoiceModal } from './InvoiceModal';
 
 export const BuyBackMarketplace: React.FC = () => {
-    const { buyBackItems, toggleBuyBackReservation, confirmBuyBackTransaction, deleteBuyBackItem, user, currentDept } = useProject();
+    const { buyBackItems, toggleBuyBackReservation, confirmBuyBackTransaction, deleteBuyBackItem, user, currentDept, project, userProfiles } = useProject();
     const [isSellModalOpen, setIsSellModalOpen] = useState(false);
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false); // Added
     const [invoiceItem, setInvoiceItem] = useState<any | null>(null);
@@ -247,7 +247,16 @@ export const BuyBackMarketplace: React.FC = () => {
                 isOpen={!!invoiceItem}
                 onClose={() => setInvoiceItem(null)}
                 item={invoiceItem}
-                filmTitle={user?.filmTitle || 'Projet Sans Titre'}
+
+                sellerName={project?.productionCompany || user?.filmTitle || 'Production'}
+                buyerName={(() => {
+                    if (!invoiceItem) return '';
+                    if (invoiceItem.reservedByUserId && userProfiles) {
+                        const profile = userProfiles.find(u => u.id === invoiceItem.reservedByUserId || u.email === invoiceItem.reservedByUserId);
+                        if (profile) return `${profile.firstName} ${profile.lastName}`;
+                    }
+                    return invoiceItem.reservedByName || invoiceItem.reservedBy || 'Inconnu';
+                })()}
             />
 
             {/* Full Screen Image Modal */}

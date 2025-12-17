@@ -11,7 +11,7 @@ interface SalesHistoryModalProps {
 }
 
 export const SalesHistoryModal: React.FC<SalesHistoryModalProps> = ({ isOpen, onClose, items }) => {
-    const { language, user } = useProject();
+    const { language, user, project, userProfiles } = useProject();
     const [invoiceItem, setInvoiceItem] = React.useState<BuyBackItem | null>(null);
 
     const t = {
@@ -206,7 +206,15 @@ export const SalesHistoryModal: React.FC<SalesHistoryModalProps> = ({ isOpen, on
                 isOpen={!!invoiceItem}
                 onClose={() => setInvoiceItem(null)}
                 item={invoiceItem}
-                filmTitle={user?.filmTitle || 'Projet Sans Titre'}
+                sellerName={project?.productionCompany || user?.filmTitle || 'Production'}
+                buyerName={(() => {
+                    if (!invoiceItem) return '';
+                    if (invoiceItem.reservedByUserId && userProfiles) {
+                        const profile = userProfiles.find(u => u.id === invoiceItem.reservedByUserId || u.email === invoiceItem.reservedByUserId);
+                        if (profile) return `${profile.firstName} ${profile.lastName}`;
+                    }
+                    return invoiceItem.reservedByName || invoiceItem.reservedBy || 'Inconnu';
+                })()}
             />
         </div >
     );
