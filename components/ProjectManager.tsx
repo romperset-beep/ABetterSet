@@ -163,16 +163,7 @@ const LogisticsWidget = ({ onClick }: { onClick: () => void }) => {
     );
 };
 
-const MemoWidget = ({ onClick }: { onClick: () => void }) => (
-    <button onClick={onClick} className="w-full h-full bg-cinema-800 p-6 rounded-xl text-white shadow-lg border border-cinema-700 text-left hover:bg-cinema-700 transition-colors group">
-        <div className="flex justify-between items-start">
-            <h3 className="text-lg font-semibold opacity-70">Mémo Rapide</h3>
-            <MessageSquare className="h-6 w-6 text-pink-500 group-hover:scale-110 transition-transform" />
-        </div>
-        <p className="text-4xl font-bold mt-2 text-pink-500">→</p>
-        <p className="text-xs text-slate-400 mt-1">Envoyer un message</p>
-    </button>
-);
+
 
 const CateringWidget = ({ onClick }: { onClick: () => void }) => {
     const { project } = useProject();
@@ -263,7 +254,7 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({
     // --- Dashboard Order Logic ---
     const allWidgets = [
         'inventory', 'callsheets', 'timesheet', 'renforts', 'logistics',
-        'memo', 'catering', 'expenses', 'team', 'buyback', 'social'
+        'catering', 'expenses', 'team', 'buyback', 'social'
     ];
 
     // Default order
@@ -314,7 +305,7 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({
             case 'timesheet': return <HoursWidget onClick={() => setActiveTab('timesheet')} />;
             case 'renforts': return <RenfortsWidget onClick={() => setActiveTab('renforts')} />;
             case 'logistics': return <LogisticsWidget onClick={() => setActiveTab('logistics')} />;
-            case 'memo': return <MemoWidget onClick={() => setActiveTab('memo')} />;
+
             case 'catering': return <CateringWidget onClick={() => setActiveTab('catering')} />;
             case 'expenses': return <ExpensesWidget onClick={() => setActiveTab('expenses')} />;
             case 'team': return <TeamWidget onClick={() => setActiveTab('team')} />;

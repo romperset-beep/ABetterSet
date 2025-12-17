@@ -6,7 +6,7 @@ import { CateringWidget } from './components/CateringWidget';
 import { TimesheetWidget } from './components/TimesheetWidget';
 import { RenfortsWidget } from './components/RenfortsWidget';
 import { LogisticsWidget } from './components/LogisticsWidget';
-import { MemoWidget } from './components/MemoWidget';
+
 import { CircularEconomy } from './components/CircularEconomy';
 import { ImpactReport } from './components/ImpactReport';
 import { GlobalStock } from './components/GlobalStock';
@@ -200,8 +200,7 @@ const AppContent: React.FC = () => {
         return <RenfortsWidget />;
       case 'logistics':
         return <LogisticsWidget />;
-      case 'memo':
-        return <MemoWidget setActiveTab={setActiveTab} />;
+
       case 'callsheets':
         return <CallSheetView />;
       case 'admin':
