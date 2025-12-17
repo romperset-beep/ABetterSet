@@ -306,6 +306,7 @@ export const AdminDashboard: React.FC = () => {
                                     <tr className="bg-cinema-900/50 text-slate-400 text-xs uppercase tracking-wider border-b border-cinema-700">
                                         <th className="px-6 py-4 font-semibold">Titre</th>
                                         <th className="px-6 py-4 font-semibold">Production</th>
+                                        <th className="px-6 py-4 font-semibold">Équipe</th>
                                         <th className="px-6 py-4 font-semibold">ID</th>
                                         <th className="px-6 py-4 font-semibold text-right">Actions</th>
                                     </tr>
@@ -330,6 +331,14 @@ export const AdminDashboard: React.FC = () => {
                                                         onChange={e => setEditForm({ ...editForm, productionCompany: e.target.value })}
                                                     />
                                                 ) : p.productionCompany}
+                                            </td>
+                                            <td className="px-6 py-4 text-slate-300">
+                                                <div className="flex items-center gap-2">
+                                                    <Users className="h-4 w-4 text-eco-500" />
+                                                    <span>
+                                                        {users.filter(u => (u as any).currentProjectId === p.id).length}
+                                                    </span>
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 text-xs text-slate-500 font-mono">{p.id}</td>
                                             <td className="px-6 py-4 text-right">
