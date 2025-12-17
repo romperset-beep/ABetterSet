@@ -65,7 +65,7 @@ export const SocialFeed: React.FC = () => {
 
     // Calculate Recent DM Partners
     const myProfile = userProfiles.find(p => p.email === user?.email);
-    const recentPartners: { id: string, name: string, lastDate: string }[] = [];
+    const recentPartners: { id: string, name: string, lastDate: string, type: 'USER' | 'DEPARTMENT', dept?: any }[] = [];
 
     if (myProfile) {
         const processedIds = new Set<string>();
@@ -92,7 +92,21 @@ export const SocialFeed: React.FC = () => {
                     recentPartners.push({
                         id: partnerId,
                         name: partnerName,
-                        lastDate: post.date
+                        lastDate: post.date,
+                        type: 'USER'
+                    });
+                }
+            } else if (post.targetAudience === 'DEPARTMENT') {
+                // Add Department conversations
+                const deptId = `DEPT_${post.targetDept}`;
+                if (!processedIds.has(deptId)) {
+                    processedIds.add(deptId);
+                    recentPartners.push({
+                        id: deptId,
+                        name: post.targetDept || 'Département',
+                        lastDate: post.date,
+                        type: 'DEPARTMENT',
+                        dept: post.targetDept
                     });
                 }
             }
@@ -289,15 +303,22 @@ export const SocialFeed: React.FC = () => {
                                     <button
                                         key={partner.id}
                                         onClick={() => {
-                                            setTargetAudience('USER');
-                                            setTargetUserId(partner.id);
-                                            setSearchTerm(partner.name);
+                                            if (partner.type === 'USER') {
+                                                setTargetAudience('USER');
+                                                setTargetUserId(partner.id);
+                                                setSearchTerm(partner.name);
+                                            } else {
+                                                setTargetAudience('DEPARTMENT');
+                                                setTargetDept(partner.dept);
+                                            }
                                             setShowRecentDiscussions(false); // Close menu after selection
                                         }}
                                         className="flex items-center gap-3 p-3 rounded-lg bg-cinema-900 hover:bg-cinema-700 transition-colors border border-cinema-700 hover:border-pink-500/50 group"
                                     >
-                                        <div className="h-8 w-8 rounded-full bg-pink-900/50 text-pink-400 flex items-center justify-center text-xs font-bold border border-pink-500/20 group-hover:border-pink-500">
-                                            {partner.name.charAt(0)}
+                                        <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold border group-hover:border-pink-500 ${partner.type === 'DEPARTMENT'
+                                            ? 'bg-purple-900/50 text-purple-400 border-purple-500/20'
+                                            : 'bg-pink-900/50 text-pink-400 border-pink-500/20'}`}>
+                                            {partner.type === 'DEPARTMENT' ? <Users className="h-4 w-4" /> : partner.name.charAt(0)}
                                         </div>
                                         <div className="flex flex-col items-start overflow-hidden">
                                             <span className="text-sm font-medium text-slate-200 group-hover:text-white truncate w-full text-left">{partner.name}</span>
