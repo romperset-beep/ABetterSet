@@ -51,8 +51,10 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, ite
 
         doc.setFontSize(11);
         doc.setTextColor(60);
-        doc.text(`Vendeur: ${item.sellerDepartment}`, 20, 90);
-        doc.text(`Acheteur: ${item.reservedBy || item.reservedByName || 'Non spécifié'}`, 20, 96);
+        // User Request: 'vendu par (le nom de la production )'
+        doc.text(`Vendu par: ${filmTitle}`, 20, 90);
+        // User Request: 'à : (le prenom et le nom de la personne qui à réservé l'article )'
+        doc.text(`À: ${item.reservedByName || item.reservedBy || 'Non spécifié'}`, 20, 96);
 
         // Table Header
         let y = 110;
@@ -117,7 +119,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, ite
                     <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                         <h3 className="font-bold text-lg mb-1">{item.name}</h3>
                         <p className="text-sm text-slate-500">
-                            Vendu par <span className="font-medium text-slate-700">{item.sellerDepartment}</span> à <span className="font-medium text-slate-700">{item.reservedBy}</span>
+                            Vendu par <span className="font-medium text-slate-700">{filmTitle}</span> à <span className="font-medium text-slate-700">{item.reservedByName || item.reservedBy || 'Inconnu'}</span>
                         </p>
                     </div>
 
@@ -131,8 +133,8 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, ite
                                     key={rate}
                                     onClick={() => setVatRate(rate)}
                                     className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium border transition-colors ${vatRate === rate
-                                            ? 'bg-blue-600 text-white border-blue-600'
-                                            : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400'
+                                        ? 'bg-blue-600 text-white border-blue-600'
+                                        : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400'
                                         }`}
                                 >
                                     {rate}%
