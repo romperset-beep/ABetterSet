@@ -138,6 +138,11 @@ export interface TimeLog {
 
   endTime: string; // HH:mm
   totalHours: number; // Calculated hours
+
+  // Detailed Breakdown (Automatically Calculated)
+  effectiveHours?: number; // Heures effectives (Amplitude - Repas/Pause)
+  nightHours22_24?: number; // Heures Nuit 22h-24h
+  nightHours00_06?: number; // Heures Nuit 00h-06h
 }
 
 export interface CarbonContext {

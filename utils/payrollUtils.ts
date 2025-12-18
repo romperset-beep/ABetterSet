@@ -291,3 +291,77 @@ export const getAvailableJobs = (convention: string | undefined): any[] => {
     if (convention === 'Annexe 3' || convention === 'Petit Budget' || convention === 'Cinéma - Annexe 3') return CINEMA_RATES_ANNEXE_3;
     return []; // Return empty if not Cinema, let caller fallback to USPA
 };
+
+export interface TimeEntry {
+    start: string; // HH:mm
+    end: string;   // HH:mm
+    mealDuration: number; // in hours (e.g. 1.0)
+}
+
+export interface ShiftResult {
+    amplitude: number;
+    effectiveHours: number;
+    nightHours22_24: number;
+    nightHours00_06: number;
+    nightHours20_22: number; // Keeping 20-22 separate just in case
+    sundayHours: number; // Placeholder
+}
+
+// Helper to parse time string "HH:mm" to decimal hours
+const timeToDecimal = (t: string): number => {
+    if (!t) return 0;
+    const [h, m] = t.split(':').map(Number);
+    return h + (m / 60);
+};
+
+export const calculateShiftDetails = (entry: TimeEntry): ShiftResult => {
+    let start = timeToDecimal(entry.start);
+    let end = timeToDecimal(entry.end);
+
+    // Handle overnight (e.g. 16:00 to 02:40 -> end becomes 26.66)
+    if (end < start) {
+        end += 24;
+    }
+
+    const amplitude = end - start;
+    const effectiveHours = Math.max(0, amplitude - entry.mealDuration);
+
+    // Night Hours Logic relative to Start Day (0h-24h) and Next Day (24h-30h+)
+
+    // Bounds
+    const night20_22_start = 20;
+    const night20_22_end = 22;
+    const night22_24_start = 22;
+    const night22_24_end = 24;
+    const night00_06_start = 0;
+    const night00_06_end = 6;
+    const next_night00_06_start = 24;
+    const next_night00_06_end = 30; // 06:00 next day
+
+    let n20_22 = 0;
+    let n22_24 = 0;
+    let n00_06 = 0;
+
+    const getOverlap = (s1: number, e1: number, s2: number, e2: number) => {
+        return Math.max(0, Math.min(e1, e2) - Math.max(s1, s2));
+    };
+
+    // 1. Morning Day 1
+    n00_06 += getOverlap(start, end, night00_06_start, night00_06_end);
+
+    // 2. Evening Day 1
+    n20_22 += getOverlap(start, end, night20_22_start, night20_22_end);
+    n22_24 += getOverlap(start, end, night22_24_start, night22_24_end);
+
+    // 3. Morning Day 2
+    n00_06 += getOverlap(start, end, next_night00_06_start, next_night00_06_end);
+
+    return {
+        amplitude: Number(amplitude.toFixed(2)),
+        effectiveHours: Number(effectiveHours.toFixed(2)),
+        nightHours20_22: Number(n20_22.toFixed(2)),
+        nightHours22_24: Number(n22_24.toFixed(2)),
+        nightHours00_06: Number(n00_06.toFixed(2)),
+        sundayHours: 0
+    };
+};

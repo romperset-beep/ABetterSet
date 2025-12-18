@@ -5,7 +5,7 @@ import { TimeLog } from '../types';
 import { db, auth } from '../services/firebase';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { Clock, Calendar, Save, Trash2, StopCircle, PlayCircle, Utensils, Users, ChevronRight, ArrowLeft, Download, Loader2, Coins } from 'lucide-react';
-import { calculateUSPAGross, calculateEstimatedSalary, getAvailableJobs } from '../utils/payrollUtils';
+import { calculateUSPAGross, calculateEstimatedSalary, getAvailableJobs, calculateShiftDetails, TimeEntry } from '../utils/payrollUtils';
 import { getJobByTitle, USPA_JOBS } from '../data/uspaRates';
 
 export const TimesheetWidget: React.FC = () => {
@@ -61,44 +61,62 @@ export const TimesheetWidget: React.FC = () => {
         fetchProfile();
     }, [user]);
 
-    // Calculate hours helper
+    // Calculate hours helper (Legacy wrapper or Direct use)
     const calculateHours = (start: string, meal: string, end: string, shortMeal: boolean, continuous: boolean, pause: number) => {
         if (!start || !end) return 0;
 
-        const [startH, startM] = start.split(':').map(Number);
-        const [endH, endM] = end.split(':').map(Number);
-
-        let startMin = startH * 60 + startM;
-        let endMin = endH * 60 + endM;
-
-        // Handle overnight shifts (crossing midnight)
-        if (endMin < startMin) {
-            endMin += 24 * 60;
-        }
-
-        let duration = endMin - startMin;
-
-        // Deductions
-        // 1. Meal: Always deduct if entered (Effective work time logic).
-        // The "Paid Break" for continuous day is handled in Salary Calculation, not here.
+        // Calculate meal duration in hours
+        let mealDuration = 0;
         if (meal) {
-            const mealDeduction = shortMeal ? 30 : 60;
-            duration -= mealDeduction;
+            mealDuration = shortMeal ? 0.5 : 1.0;
         }
-
-        // 2. Manual Pause (Unpaid)
         if (pause > 0) {
-            duration -= pause;
+            mealDuration += pause / 60;
         }
 
-        return Math.max(0, duration / 60);
+        const details = calculateShiftDetails({
+            start,
+            end,
+            mealDuration
+        });
+
+        return details.effectiveHours;
     };
+
+    // New Helper for full breakdown
+    const getShiftBreakdown = () => {
+        if (!callTime || !endTime) return null;
+
+        // Calculate meal duration
+        let mealDuration = 0;
+        // Only count meal deduction if meal time is set, OR if it's implicitly handled.
+        // User inputs "Repas (Début)". If set, we deduce.
+        if (mealTime) {
+            mealDuration = hasShortenedMeal ? 0.5 : 1.0;
+        }
+        // Add manual pause
+        if (breakDuration > 0) {
+            mealDuration += breakDuration / 60;
+        }
+
+        return calculateShiftDetails({
+            start: callTime,
+            end: endTime,
+            mealDuration
+        });
+    };
+
 
     const handleSaveLog = async () => {
         if (!callTime || !endTime || !user) return;
 
-        const totalHours = calculateHours(callTime, mealTime, endTime, hasShortenedMeal, isContinuousDay, breakDuration);
-        const logId = `${date}_${user.email} `;
+        const breakdown = getShiftBreakdown();
+        const totalHours = breakdown ? breakdown.effectiveHours : 0;
+
+        // Safety check
+        if (totalHours === 0 && !window.confirm("Total d'heures calculé est 0. Continuer ?")) return;
+
+        const logId = `${date}_${user.email}`;
 
         const newLog: TimeLog = {
             id: logId,
@@ -122,7 +140,12 @@ export const TimesheetWidget: React.FC = () => {
             userRole: userProfileData.role || '',
 
             endTime,
-            totalHours
+            totalHours,
+
+            // New Detailed Fields
+            effectiveHours: breakdown?.effectiveHours,
+            nightHours22_24: breakdown?.nightHours22_24,
+            nightHours00_06: breakdown?.nightHours00_06
         };
 
         // Remove existing log for same day/user if any, then add new
@@ -327,16 +350,18 @@ export const TimesheetWidget: React.FC = () => {
                 }));
             }
 
-            const headers = ['Date', 'Nom', 'Prénom', 'Fonction', 'Département', 'Début', 'Fin', 'Repas (Début)', 'Repas Écourté', 'Journée Continue', 'Pause (min)', 'Heure Pause', 'Note', 'Heures Totales'];
+            const headers = ['Date', 'Nom', 'Prénom', 'Fonction', 'Département', 'Début', 'Fin', 'Repas', 'Pause (min)', 'Ampli (h)', 'Eff. (h)', 'Nuit 22-24', 'Nuit 00-06', 'Note', 'Total Validé'];
             const rows = logs.map(log => {
-                // Determine best available data
                 const profile = profileMap[log.userId];
-
-                // Fallback Priority: Log data > Fetched Profile > Fallback splits
                 const lastName = log.userLastName || profile?.lastName || log.userName.split(' ').slice(1).join(' ');
                 const firstName = log.userFirstName || profile?.firstName || log.userName.split(' ')[0];
                 const role = log.userRole || profile?.role || '';
                 const dateFormatted = formatDateFR(log.date);
+
+                // Calculate or use stored values
+                const ampli = log.totalHours + (log.breakDuration ? log.breakDuration / 60 : 0) + (log.mealTime ? (log.hasShortenedMeal ? 0.5 : 1) : 0);
+                // Note: Amplitude is rough estimation if not stored, but acceptable for display. 
+                // Better: Use log.effectiveHours if available (new logs), else log.totalHours.
 
                 return [
                     dateFormatted,
@@ -347,11 +372,13 @@ export const TimesheetWidget: React.FC = () => {
                     log.callTime,
                     log.endTime,
                     log.mealTime || '',
-                    log.hasShortenedMeal ? 'OUI' : 'NON',
-                    log.isContinuousDay ? 'OUI' : 'NON',
                     log.breakDuration || 0,
-                    log.pauseTime || '', // Added
-                    `"${(log.note || '').replace(/"/g, '""')}"`, // Escape quotes
+                    // New Columns
+                    formatHours(ampli || log.totalHours), // Approx Amplitude
+                    formatHours(log.effectiveHours || log.totalHours),
+                    formatHours(log.nightHours22_24 || 0),
+                    formatHours(log.nightHours00_06 || 0),
+                    `"${(log.note || '').replace(/"/g, '""')}"`,
                     formatHours(log.totalHours)
                 ];
             });
@@ -603,6 +630,21 @@ export const TimesheetWidget: React.FC = () => {
                                         {formatHours(calculateHours(callTime, mealTime, endTime, hasShortenedMeal, isContinuousDay, breakDuration))}
                                     </span>
                                 </div>
+
+                                {/* Dynamic Night Hours Feedback */}
+                                {(() => {
+                                    const bd = getShiftBreakdown();
+                                    if (bd && (bd.nightHours22_24 > 0 || bd.nightHours00_06 > 0)) {
+                                        return (
+                                            <div className="col-span-full bg-purple-900/20 px-4 py-2 rounded-lg border border-purple-500/30 flex gap-4 text-xs font-bold text-purple-300">
+                                                <span>Heures Nuit :</span>
+                                                {bd.nightHours22_24 > 0 && <span>22h-24h : {bd.nightHours22_24}h</span>}
+                                                {bd.nightHours00_06 > 0 && <span>00h-06h : {bd.nightHours00_06}h</span>}
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                })()}
 
                                 {/* Salary Estimate - Only for USPA Projects (Telefilm / Plateforme / Série TV) */}
                                 {['Long Métrage', 'Série TV', 'Téléfilm', 'Plateforme', 'Publicité'].includes(project.projectType) && (
