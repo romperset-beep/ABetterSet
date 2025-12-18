@@ -63,28 +63,64 @@ export const TimesheetWidget: React.FC = () => {
 
     // Auto-Toggle Continuous Day
     useEffect(() => {
-        if (!callTime || !endTime) return;
+        if (!callTime) return;
+
+        // If manual break exists, we assume user manages continuity (rule: "without manual pause")
+        if (breakDuration && breakDuration > 0) {
+            setIsContinuousDay(false);
+            return;
+        }
 
         const parse = (t: string) => {
+            if (!t) return null;
             const [h, m] = t.split(':').map(Number);
             return h + (m / 60);
         };
 
-        let start = parse(callTime);
-        let end = parse(endTime);
-        if (end < start) end += 24;
+        const start = parse(callTime);
+        if (start === null) return;
 
-        const amplitude = end - start;
+        let triggered = false;
 
-        // Rule: If work >= 6h WITHOUT interruption (no meal, no break) -> Continuous Day
-        if (amplitude >= 6 && !mealTime && (!breakDuration || breakDuration === 0)) {
-            setIsContinuousDay(true);
-        } else {
-            // Implicit: If condition fails (e.g. user adds a meal), we uncheck it.
-            // This enforces the rule "Continuous Day = No Break".
-            setIsContinuousDay(false);
+        // Check against Meal if it exists
+        if (mealTime) {
+            let mealStart = parse(mealTime);
+            if (mealStart !== null) {
+                if (mealStart < start) mealStart += 24;
+
+                // Block 1: Before Meal
+                const preMealDuration = mealStart - start;
+                if (preMealDuration >= 6) triggered = true;
+
+                // Block 2: After Meal
+                if (!triggered && endTime) {
+                    let end = parse(endTime);
+                    if (end !== null) {
+                        const mealDur = hasShortenedMeal ? 0.5 : 1.0;
+                        const mealEnd = mealStart + mealDur;
+
+                        if (end < mealEnd) end += 24; // Handle spillover
+
+                        const postMealDuration = end - mealEnd;
+                        if (postMealDuration >= 6) {
+                            triggered = true;
+                        }
+                    }
+                }
+            }
+        } else if (endTime) {
+            // No Meal: Check Total
+            let end = parse(endTime);
+            if (end !== null) {
+                if (end < start) end += 24;
+                const amplitude = end - start;
+                if (amplitude >= 6) triggered = true;
+            }
         }
-    }, [callTime, endTime, mealTime, breakDuration]);
+
+        setIsContinuousDay(triggered);
+
+    }, [callTime, endTime, mealTime, hasShortenedMeal, breakDuration]);
 
     // Calculate hours helper (Legacy wrapper or Direct use)
     const calculateHours = (start: string, meal: string, end: string, shortMeal: boolean, continuous: boolean, pause: number) => {
