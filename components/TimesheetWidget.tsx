@@ -319,7 +319,7 @@ export const TimesheetWidget: React.FC = () => {
     const formatHours = (decimalHours: number) => {
         const hours = Math.floor(decimalHours);
         const minutes = Math.round((decimalHours - hours) * 60);
-        return `${hours}h${minutes > 0 ? minutes.toString().padStart(2, '0') : ''} `;
+        return `${hours}h${minutes > 0 ? minutes.toString().padStart(2, '0') : ''}`;
     };
 
     const downloadCSV = async (logs: TimeLog[], filename: string) => {
@@ -401,8 +401,8 @@ export const TimesheetWidget: React.FC = () => {
             });
 
             let csvContent = [
-                headers.join(','),
-                ...rows.map(r => r.join(','))
+                headers.join(';'),
+                ...rows.map(r => r.join(';'))
             ].join('\n');
 
             // Add Total Hours Summary Row
