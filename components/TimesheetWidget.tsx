@@ -835,6 +835,20 @@ export const TimesheetWidget: React.FC = () => {
 
                                                             const logDate = new Date(log.date);
                                                             const isSunday = logDate.getDay() === 0;
+                                                            const isHoliday = isFrenchPublicHoliday(logDate);
+
+                                                            const est = calculateEstimatedSalary({
+                                                                job,
+                                                                hoursWorked: hours,
+                                                                contractType: 'JOUR',
+                                                                travelHoursInside: log.travelHoursInside || 0,
+                                                                travelHoursOutside: log.travelHoursOutside || 0,
+                                                                isContinuousDay: log.isContinuousDay,
+                                                                convention: project.convention,
+                                                                isSunday,
+                                                                isHoliday
+                                                            });
+
                                                             totalGross += est.grossAmount;
                                                         }
                                                     });
