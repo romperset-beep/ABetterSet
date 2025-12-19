@@ -140,7 +140,7 @@ export const MarketplacePage: React.FC = () => {
                     <div>
                         <div className="flex items-center gap-3 mb-2">
                             <Globe className="h-8 w-8 text-indigo-400" />
-                            <h1 className="text-3xl font-bold text-white">Stock Virtuel Global</h1>
+                            <h1 className="text-3xl font-bold text-white">Espace de Revente Circulaire Inter-Productions</h1>
                         </div>
                         <p className="text-indigo-200 text-lg max-w-2xl">
                             Accédez aux surplus de toutes les productions connectées.
