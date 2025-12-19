@@ -131,9 +131,15 @@ export const MarketplacePage: React.FC = () => {
                                     <div className="pt-2">
                                         <div className="text-xs text-slate-500 mb-1">Status :</div>
                                         <div className="flex flex-wrap gap-2">
-                                            <span className="text-xs px-2 py-1 bg-indigo-500/20 text-indigo-300 rounded-md border border-indigo-500/30">
-                                                Disponible
-                                            </span>
+                                            {item.status === 'SOLD' ? (
+                                                <span className="text-xs px-2 py-1 bg-red-500/20 text-red-400 rounded-md border border-red-500/30 uppercase font-bold">
+                                                    Vendu
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs px-2 py-1 bg-indigo-500/20 text-indigo-300 rounded-md border border-indigo-500/30">
+                                                    {item.status || 'Disponible'}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

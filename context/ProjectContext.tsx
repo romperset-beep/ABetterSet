@@ -529,52 +529,69 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       const items: ConsumableItem[] = [];
 
       // 1. Query 'items' (Surplus from Inventory)
-      const qSurplus = query(
-        collectionGroup(db, 'items'),
-        where('surplusAction', '==', 'MARKETPLACE')
-      );
+      // This might fail if index is missing. We'll handle it gracefully.
+      const fetchSurplus = async () => {
+        try {
+          const qSurplus = query(
+            collectionGroup(db, 'items'),
+            where('surplusAction', '==', 'MARKETPLACE')
+          );
+          const snap = await getDocs(qSurplus);
+          const results: ConsumableItem[] = [];
+          snap.forEach(doc => results.push({ id: doc.id, ...doc.data() } as ConsumableItem));
+          return results;
+        } catch (error: any) {
+          console.error("Failed to fetch Global Surplus (Index missing?):", error);
+          // If we could notify user about index, we would. For now, return empty.
+          return [];
+        }
+      };
 
       // 2. Query 'buyBackItems' (Manual Sales)
-      // Note: collectionGroup query might fail if permissions/indexes aren't set for buyBackItems yet
-      // We assume basic read rules are open for auth users (we set that in step 1428)
-      const qBuyBack = query(collectionGroup(db, 'buyBackItems'));
+      const fetchBuyBack = async () => {
+        try {
+          const qBuyBack = query(collectionGroup(db, 'buyBackItems'));
+          const snap = await getDocs(qBuyBack);
+          const results: ConsumableItem[] = [];
 
-      const [snapSurplus, snapBuyBack] = await Promise.all([
-        getDocs(qSurplus),
-        getDocs(qBuyBack)
+          snap.forEach(doc => {
+            const data = doc.data();
+            // Include AVAILABLE, RESERVED, and SOLD (for history)
+            // User asked: "je ne vois plus les articles vendu" -> They want to see history.
+
+            results.push({
+              id: doc.id,
+              name: data.name,
+              department: data.sellerDepartment,
+              quantityCurrent: 1,
+              unit: 'unité',
+              status: data.status === 'AVAILABLE' ? ItemStatus.USED : (data.status as any), // Map status
+              surplusAction: SurplusAction.MARKETPLACE,
+              purchased: true,
+              price: data.price,
+              photo: data.photo,
+              description: data.description,
+              // Keep original data for specific UI handling if needed
+              ...data
+            } as ConsumableItem);
+          });
+          return results;
+        } catch (error) {
+          console.error("Failed to fetch BuyBack items:", error);
+          return [];
+        }
+      };
+
+      const [surplusItems, buyBackItems] = await Promise.all([
+        fetchSurplus(),
+        fetchBuyBack()
       ]);
 
-      // Process Surplus
-      snapSurplus.forEach(doc => {
-        const data = doc.data();
-        items.push({ id: doc.id, ...data } as ConsumableItem);
-      });
-
-      // Process BuyBack (Normalize to ConsumableItem structure)
-      snapBuyBack.forEach(doc => {
-        const data = doc.data();
-        // Skip sold/reserved if we only want available? No, user wants to see everything probably or filter.
-        // Marketplace usually shows Available.
-        if (data.status !== 'AVAILABLE') return;
-
-        items.push({
-          id: doc.id,
-          name: data.name,
-          department: data.sellerDepartment,
-          quantityCurrent: 1, // BuyBack items are usually unique/singular unit unless specified
-          unit: 'unité',
-          status: ItemStatus.USED, // Assume used
-          surplusAction: SurplusAction.MARKETPLACE,
-          purchased: true,
-          price: data.price,
-          // Add specific buyback fields if needed, but for now fit into ConsumableItem generic display
-        } as ConsumableItem);
-      });
+      items.push(...surplusItems, ...buyBackItems);
 
       return items;
     } catch (err) {
       console.error("Error fetching global marketplace:", err);
-      // Return whatever we managed to get or empty
       return [];
     }
   };
