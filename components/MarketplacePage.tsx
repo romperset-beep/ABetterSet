@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useProject } from '../context/ProjectContext';
 import { ShoppingBag, Tag, Search, Filter, Globe, ExternalLink, Plus } from 'lucide-react';
-import { ConsumableItem, SurplusAction, Department, ItemStatus } from '../types';
+import { ConsumableItem, SurplusAction, Department, ItemStatus, Transaction } from '../types';
 import { SellItemModal } from './SellItemModal'; // Added
+import { collection, addDoc, doc, updateDoc, increment } from 'firebase/firestore';
+import { db } from '../services/firebase';
 
 // Extended interface to include Project ID (added in Context query)
 interface MarketplaceItem extends ConsumableItem {
     projectId?: string; // We'll try to populate this if possible, or infer
+    productionName?: string; // Added for transaction
 }
 
 export const MarketplacePage: React.FC = () => {
@@ -115,16 +118,62 @@ export const MarketplacePage: React.FC = () => {
         setContactQuantities(prev => ({ ...prev, [id]: val }));
     };
 
-    const handleMailContact = () => {
-        const subject = encodeURIComponent("Intérêt rachat matériel - A Better Set");
-        const itemList = activeContactItems.map(i => {
-            const qty = contactQuantities[i.id] || i.quantityCurrent;
-            return `- ${i.name} (x${qty} / ${i.quantityCurrent}) - Prix : ${i.price || '?'}€/u`;
-        }).join('\n');
+    const handleContactSubmit = async () => {
+        if (!user) {
+            alert("Vous devez être connecté pour acheter.");
+            return;
+        }
 
-        const body = encodeURIComponent(`Bonjour,\n\nJe suis intéressé par le rachat des articles suivants :\n\n${itemList}\n\nMerci de me recontacter.\n\nCordialement,\n${user?.name || ''}`);
-        window.location.href = `mailto:rachats@abetterset.com?subject=${subject}&body=${body}`;
-        setContactModalOpen(false);
+        try {
+            const transactionData: Omit<Transaction, 'id'> = {
+                sellerId: activeContactItems[0].projectId || 'UNKNOWN_PROJECT',
+                sellerName: activeContactItems[0].productionName || 'Production Inconnue',
+                buyerId: user.currentProjectId || 'UNKNOWN_BUYER',
+                buyerName: user.productionName || user.name,
+                items: activeContactItems.map(i => ({
+                    id: i.id,
+                    name: i.name,
+                    quantity: contactQuantities[i.id] || 1,
+                    price: i.price || 0
+                })),
+                totalAmount: activeContactItems.reduce((sum, i) => sum + ((i.price || 0) * (contactQuantities[i.id] || 1)), 0),
+                status: 'PENDING',
+                createdAt: new Date().toISOString()
+            };
+
+            await addDoc(collection(db, 'transactions'), transactionData);
+
+            // Update Stock (Decrement) for ALL items in transaction
+            // This effectively "hides" them from Marketplace if qty becomes 0
+            await Promise.all(activeContactItems.map(async (i) => {
+                if (i.projectId) {
+                    const qtyToBuy = contactQuantities[i.id] || 1;
+                    const itemRef = doc(db, 'projects', i.projectId, 'items', i.id);
+                    await updateDoc(itemRef, {
+                        quantityCurrent: increment(-qtyToBuy)
+                    });
+                }
+            }));
+
+            alert("✅ Demande d'achat envoyée à l'administrateur ! Vous serez recontacté pour la facturation.");
+            setContactModalOpen(false);
+            setActiveContactItems([]);
+            setSelectedItems(new Set());
+
+            // Refresh items locally to update UI immediately
+            const updatedItems = items.map(i => {
+                const purchasedQty = contactQuantities[i.id];
+                if (purchasedQty && activeContactItems.find(active => active.id === i.id)) {
+                    return { ...i, quantityCurrent: i.quantityCurrent - purchasedQty };
+                }
+                return i;
+            }).filter(i => i.quantityCurrent > 0);
+            setItems(updatedItems);
+
+        } catch (error: any) {
+            console.error("Error creating transaction:", error);
+            alert("Erreur lors de la création de la demande: " + error.message);
+        }
     };
 
     const handlePhoneContact = () => {
@@ -250,9 +299,21 @@ export const MarketplacePage: React.FC = () => {
 
                             {/* Card Body */}
                             <div className="p-5 flex-1 flex flex-col">
-                                <h3 className="text-xl font-bold text-white mb-2 line-clamp-2">{item.name}</h3>
-
                                 <div className="space-y-3 mt-2 flex-1">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                            <h3 className="text-xl font-bold text-white truncate pr-2">{item.name}</h3>
+                                            {item.productionName && (
+                                                <p className="text-xs text-indigo-300 font-medium truncate max-w-[150px]">
+                                                    {item.productionName}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div className="bg-cinema-900 border border-cinema-700 rounded px-2 py-1 text-center min-w-[3rem]">
+                                            <span className="block text-sm font-bold text-yellow-400">{item.price ? `${item.price} €` : '-'}</span>
+                                        </div>
+                                    </div>
+
                                     <div className="flex justify-between items-center text-sm">
                                         <span className="text-slate-400">Quantité :</span>
                                         <span className="text-white font-mono bg-cinema-700 px-2 py-0.5 rounded">
@@ -409,13 +470,13 @@ export const MarketplacePage: React.FC = () => {
 
                         <div className="grid grid-cols-2 gap-4">
                             <button
-                                onClick={handleMailContact}
+                                onClick={handleContactSubmit}
                                 className="flex flex-col items-center justify-center gap-3 p-6 bg-cinema-700/50 border border-cinema-600 rounded-xl hover:bg-indigo-600 hover:border-indigo-500 hover:scale-105 transition-all group"
                             >
                                 <div className="p-3 bg-cinema-800 rounded-full group-hover:bg-indigo-500 transition-colors">
                                     <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                                 </div>
-                                <span className="font-bold text-white">Par Email</span>
+                                <span className="font-bold text-white">Confirmer Demande d'Achat</span>
                             </button>
 
                             <button

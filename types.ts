@@ -37,7 +37,9 @@ export enum SurplusAction {
   RELEASED_TO_PROD = 'Libéré pour la Prod (Fin Tournage)',
   MARKETPLACE = 'Stock Virtuel (Réemploi)',
   DONATION = 'Don Pédagogique (Écoles)',
-  SHORT_FILM = 'Don Court-Métrage'
+  SHORT_FILM = 'Don Court-Métrage',
+  BUYBACK = 'Rachat A Better Set',
+  STORAGE = 'Stock Production Future'
 }
 
 export interface ConsumableItem {
@@ -48,6 +50,9 @@ export interface ConsumableItem {
   quantityCurrent: number;
   unit: string; // e.g., "rouleaux", "boîtes", "bouteilles"
   status: ItemStatus;
+  // Metadata for Marketplace
+  projectId?: string;
+  productionName?: string;
   surplusAction?: SurplusAction;
   ecoScore?: number; // 1-10
   purchased: boolean; // true if in stock, false if just a request/need
@@ -321,4 +326,22 @@ export interface CatalogItem {
   department: Department | 'PRODUCTION';
   usageCount: number; // For sorting/popularity
   lastUsed: string; // ISO Date
+}
+
+export interface Transaction {
+  id: string;
+  sellerId: string; // Project ID (Production A)
+  sellerName: string;
+  buyerId: string; // Project ID (Production B)
+  buyerName: string;
+  items: {
+    id: string;
+    name: string;
+    quantity: number;
+    price: number;
+  }[];
+  totalAmount: number;
+  status: 'PENDING' | 'VALIDATED' | 'COMPLETED' | 'CANCELLED';
+  createdAt: string;
+  invoicedAt?: string;
 }

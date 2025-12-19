@@ -60,8 +60,8 @@ interface ProjectContextType {
 
   currentDept: string;
   setCurrentDept: (dept: string) => void;
-  circularView: 'overview' | 'marketplace' | 'donations' | 'shortFilm';
-  setCircularView: (view: 'overview' | 'marketplace' | 'donations' | 'shortFilm') => void;
+  circularView: 'overview' | 'marketplace' | 'donations' | 'shortFilm' | 'sales_abs';
+  setCircularView: (view: 'overview' | 'marketplace' | 'donations' | 'shortFilm' | 'sales_abs') => void;
 
   // Auth
   user: User | null;
@@ -159,6 +159,7 @@ const DEFAULT_PROJECT: Project = {
 };
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
+// Context defined
 
 export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // Persist user in localStorage for better DX
@@ -174,7 +175,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const [project, setProject] = useState<Project>(DEFAULT_PROJECT);
   const [currentDept, setCurrentDept] = useState<string>('PRODUCTION');
-  const [circularView, setCircularView] = useState<'overview' | 'marketplace' | 'donations' | 'shortFilm'>('overview');
+  const [circularView, setCircularView] = useState<'overview' | 'marketplace' | 'donations' | 'shortFilm' | 'sales_abs'>('overview');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [expenseReports, setExpenseReports] = useState<ExpenseReport[]>([]);
   const [language, setLanguage] = useState<Language>('fr');
@@ -527,20 +528,66 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     try {
       if (!user) return [];
 
-      // Query 'items' (Surplus from Inventory)
-      // This might fail if index is missing. We'll handle it gracefully.
       try {
-        const qSurplus = query(
-          collectionGroup(db, 'items'),
-          where('surplusAction', '==', SurplusAction.MARKETPLACE)
-        );
-        const snap = await getDocs(qSurplus);
-        const results: ConsumableItem[] = [];
-        snap.forEach(doc => results.push({ id: doc.id, ...doc.data() } as ConsumableItem));
+        // Fetch both Standard Marketplace items and Buyback items (now owned by ABS)
+        const [snapMarket, snapBuyback] = await Promise.all([
+          getDocs(query(
+            collectionGroup(db, 'items'),
+            where('surplusAction', '==', SurplusAction.MARKETPLACE)
+          )),
+          getDocs(query(
+            collectionGroup(db, 'items'),
+            where('surplusAction', '==', SurplusAction.BUYBACK)
+          ))
+        ]);
+
+        const rawItems: { item: ConsumableItem, pid: string }[] = [];
+        const projectIds = new Set<string>();
+
+        const processSnap = (snap: any) => {
+          snap.forEach((itemDoc: any) => {
+            const data = itemDoc.data() as ConsumableItem;
+            if (data.quantityCurrent > 0) {
+              const pid = itemDoc.ref.parent.parent?.id;
+              if (pid) {
+                projectIds.add(pid);
+                rawItems.push({ item: { id: itemDoc.id, ...data }, pid });
+              }
+            }
+          });
+        };
+
+        processSnap(snapMarket);
+        processSnap(snapBuyback);
+
+        // Optimization: Fetch names in parallel
+        const projectNames: Record<string, string> = {};
+        await Promise.all(Array.from(projectIds).map(async (pid) => {
+          try {
+            const pRef = doc(db, 'projects', pid);
+            const pSnap = await getDoc(pRef);
+            if (pSnap.exists()) {
+              projectNames[pid] = pSnap.data().productionCompany || pSnap.data().name || "Production Inconnue";
+            }
+          } catch (e) {
+            console.warn(`Could not fetch project ${pid} details for marketplace`);
+          }
+        }));
+
+        const results = rawItems.map(({ item, pid }) => ({
+          ...item,
+          projectId: pid,
+          // Mask seller name for Buyback items
+          productionName: item.surplusAction === SurplusAction.BUYBACK
+            ? "A BETTER SET"
+            : (projectNames[pid] || "Production Inconnue")
+        }));
+
         return results;
+
       } catch (error: any) {
-        console.error("Failed to fetch Global Surplus (Index missing?):", error);
-        setError(`Erreur Marketplace: ${error.message}. Si c'est une erreur d'index, consultez la console ou contactez le support.`);
+        console.error("Failed to fetch Global Surplus:", error);
+        setError(`Erreur Marketplace: ${error.message}`);
         return [];
       }
     } catch (err) {

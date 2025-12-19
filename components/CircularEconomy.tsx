@@ -1,7 +1,10 @@
 import React from 'react';
-import { SurplusAction, ItemStatus } from '../types';
-import { Recycle, Heart, ShoppingBag, ArrowRight, Check, LayoutDashboard, RefreshCw, GraduationCap, Box, Undo2, Film, Edit2 } from 'lucide-react';
+import { SurplusAction, ItemStatus, Transaction } from '../types';
+import { Recycle, Heart, ShoppingBag, ArrowRight, Check, LayoutDashboard, RefreshCw, GraduationCap, Box, Undo2, Film, Edit2, Archive, DollarSign, Download, FileText } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
+import { db } from '../services/firebase';
+import { collection, addDoc } from 'firebase/firestore';
+import { generateInvoice } from '../utils/invoiceGenerator';
 
 export const CircularEconomy: React.FC = () => {
     const { project, setProject, circularView: view, setCircularView: setView, addNotification, user, updateItem, addItem } = useProject();
@@ -54,6 +57,40 @@ export const CircularEconomy: React.FC = () => {
         } catch (err: any) {
             console.error("Error updating surplus action:", err);
             alert(`Erreur sauvegarde : ${err.message}`);
+        }
+    };
+
+    const handleBuyback = async (item: any) => {
+        const buybackPrice = (item.originalPrice || item.price || 0) * 0.5;
+        const potentialGain = buybackPrice * item.quantityCurrent;
+
+        if (!window.confirm(`Confirmer la vente à A BETTER SET pour 50% du prix ?\nGain estimé : ${potentialGain.toFixed(2)} €`)) return;
+
+        try {
+            // Create Transaction for ABS Buyback
+            const transactionData: Omit<Transaction, 'id'> = {
+                sellerId: project.id,
+                sellerName: project.productionCompany || project.name,
+                buyerId: 'ABETTERSET_PLATFORM',
+                buyerName: 'A Better Set',
+                items: [{
+                    id: item.id,
+                    name: item.name,
+                    quantity: item.quantityCurrent,
+                    price: buybackPrice
+                }],
+                totalAmount: potentialGain,
+                status: 'PENDING',
+                createdAt: new Date().toISOString()
+            };
+
+            await addDoc(collection(db, 'transactions'), transactionData);
+            await setAction(item.id, SurplusAction.BUYBACK);
+            addNotification("Demande de rachat A Better Set envoyée", "SUCCESS");
+
+        } catch (error: any) {
+            console.error("Buyback error", error);
+            alert("Erreur: " + error.message);
         }
     };
 
@@ -420,7 +457,7 @@ export const CircularEconomy: React.FC = () => {
             {/* OVERVIEW / MANAGEMENT VIEW */}
             {view === 'overview' && (
                 <>
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                         <button onClick={() => setView('marketplace')} className="bg-cinema-800 p-6 rounded-xl border border-cinema-700 relative overflow-hidden group hover:bg-cinema-750 transition-all text-left">
                             <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-blue-500 blur-[50px] opacity-10 group-hover:opacity-20 transition-opacity"></div>
                             <div className="flex justify-between items-start mb-4">
@@ -455,6 +492,18 @@ export const CircularEconomy: React.FC = () => {
                             </div>
                             <h3 className="text-lg font-bold text-white">Court-Métrage</h3>
                             <p className="text-sm text-slate-400 mt-2">Soutien à la création jeune.</p>
+                        </button>
+
+                        <button onClick={() => setView('sales_abs')} className="bg-cinema-800 p-6 rounded-xl border border-cinema-700 relative overflow-hidden group hover:bg-cinema-750 transition-all text-left">
+                            <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-emerald-500 blur-[50px] opacity-10 group-hover:opacity-20 transition-opacity"></div>
+                            <div className="flex justify-between items-start mb-4">
+                                <div className="bg-emerald-500/20 text-emerald-400 p-3 rounded-lg">
+                                    <DollarSign className="h-6 w-6" />
+                                </div>
+                                <span className="text-4xl font-bold text-white">{totalSurplusItems.filter(i => i.surplusAction === SurplusAction.BUYBACK).length}</span>
+                            </div>
+                            <h3 className="text-lg font-bold text-white">Rachats ABS</h3>
+                            <p className="text-sm text-slate-400 mt-2">Articles vendus à la plateforme.</p>
                         </button>
 
                         <div className="bg-cinema-800 p-6 rounded-xl border border-cinema-700 relative overflow-hidden">
@@ -586,22 +635,42 @@ export const CircularEconomy: React.FC = () => {
                                             <span className="text-xs text-slate-500 uppercase">{item.unit}</span>
                                         </div>
                                         {user?.department === 'PRODUCTION' && (
-                                            <button
-                                                onClick={() => handleTransferClick(item, SurplusAction.DONATION)}
-                                                className="p-2 text-purple-500 hover:text-purple-300 hover:bg-purple-500/20 rounded-full transition-colors"
-                                                title="Transférer vers Dons"
-                                            >
-                                                <GraduationCap className="h-5 w-5" />
-                                            </button>
-                                        )}
-                                        {user?.department === 'PRODUCTION' && (
-                                            <button
-                                                onClick={() => handleTransferClick(item, SurplusAction.SHORT_FILM)}
-                                                className="p-2 text-orange-500 hover:text-orange-300 hover:bg-orange-500/20 rounded-full transition-colors"
-                                                title="Transférer vers Court-Métrage"
-                                            >
-                                                <Film className="h-5 w-5" />
-                                            </button>
+                                            <div className="flex flex-col gap-2 items-end">
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => handleTransferClick(item, SurplusAction.DONATION)}
+                                                        className="p-2 text-purple-500 hover:text-purple-300 hover:bg-purple-500/20 rounded-full transition-colors"
+                                                        title="Transférer vers Dons"
+                                                    >
+                                                        <GraduationCap className="h-5 w-5" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleTransferClick(item, SurplusAction.SHORT_FILM)}
+                                                        className="p-2 text-orange-500 hover:text-orange-300 hover:bg-orange-500/20 rounded-full transition-colors"
+                                                        title="Transférer vers Court-Métrage"
+                                                    >
+                                                        <Film className="h-5 w-5" />
+                                                    </button>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => handleBuyback(item)}
+                                                        className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-600/30 rounded text-xs transition-colors"
+                                                        title="Rachat à 50% du prix"
+                                                    >
+                                                        <DollarSign className="h-3 w-3" />
+                                                        Rachat ABS (50%)
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setAction(item.id, SurplusAction.STORAGE)}
+                                                        className="flex items-center gap-1.5 px-3 py-1 bg-slate-700/30 hover:bg-slate-700/50 text-slate-400 border border-slate-600/30 rounded text-xs transition-colors"
+                                                        title="Garder pour production future"
+                                                    >
+                                                        <Archive className="h-3 w-3" />
+                                                        Stocker
+                                                    </button>
+                                                </div>
+                                            </div>
                                         )}
                                         <button
                                             onClick={() => setAction(item.id, SurplusAction.NONE)}
@@ -617,6 +686,12 @@ export const CircularEconomy: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {/* SALES TO ABS VIEW */}
+            {view === 'sales_abs' && (
+                <ViewSalesToABS items={totalSurplusItems.filter(i => i.surplusAction === SurplusAction.BUYBACK)} project={project} />
+            )}
+
 
             {/* DONATIONS LIST VIEW */}
             {view === 'donations' && (
@@ -738,6 +813,124 @@ export const CircularEconomy: React.FC = () => {
                     </div>
                 </div>
             )}
+        </div>
+    );
+};
+
+const ViewSalesToABS: React.FC<{ items: any[], project: any }> = ({ items, project }) => {
+    const buybackItems = items.map(item => ({
+        ...item,
+        buybackPrice: (item.originalPrice || item.price || 0) * 0.5
+    }));
+
+    const totalAmount = buybackItems.reduce((sum, item) => sum + (item.buybackPrice * item.quantityCurrent), 0);
+
+    const handleExportCSV = () => {
+        const headers = ["Article", "Département", "Quantité", "Prix Unitaire (50%)", "Total"];
+        const rows = buybackItems.map(item => [
+            item.name,
+            item.department,
+            item.quantityCurrent.toString(),
+            item.buybackPrice.toFixed(2),
+            (item.buybackPrice * item.quantityCurrent).toFixed(2)
+        ]);
+
+        const csvContent = [
+            headers.join(";"),
+            ...rows.map(r => r.join(";"))
+        ].join("\n");
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `Ventes_ABS_${project.name}_${new Date().toISOString().slice(0, 10)}.csv`;
+        link.click();
+    };
+
+    const handleInvoice = () => {
+        if (buybackItems.length === 0) return;
+
+        const transaction: Transaction = {
+            id: `INV-${Date.now()}`,
+            sellerId: project.id,
+            sellerName: project.productionCompany || project.name,
+            buyerId: 'ABETTERSET_PLATFORM',
+            buyerName: 'A Better Set',
+            items: buybackItems.map(i => ({
+                id: i.id,
+                name: i.name,
+                price: i.buybackPrice,
+                quantity: i.quantityCurrent
+            })),
+            totalAmount: totalAmount,
+            status: 'VALIDATED', // Assumed validated for invoice generation context
+            createdAt: new Date().toISOString(),
+            invoicedAt: new Date().toISOString()
+        };
+
+        generateInvoice(transaction);
+    };
+
+    return (
+        <div className="bg-cinema-800 rounded-xl border border-cinema-700 overflow-hidden shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div className="bg-emerald-900/20 border-b border-emerald-500/20 p-6 flex justify-between items-center">
+                <div className="flex items-center gap-3 text-emerald-400">
+                    <DollarSign className="h-6 w-6" />
+                    <div>
+                        <h3 className="font-bold text-lg">Ventes à A Better Set</h3>
+                        <p className="text-xs text-slate-400">Articles rachetés par la plateforme (50% du prix)</p>
+                    </div>
+                </div>
+                <div className="flex gap-3">
+                    <button onClick={handleExportCSV} className="flex items-center gap-2 px-4 py-2 border border-cinema-600 rounded-lg hover:bg-cinema-700 text-slate-300 transition-colors text-sm">
+                        <Download className="h-4 w-4" />
+                        Export CSV
+                    </button>
+                    <button onClick={handleInvoice} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold shadow-lg shadow-emerald-900/20 transition-all text-sm">
+                        <FileText className="h-4 w-4" />
+                        Facture
+                    </button>
+                </div>
+            </div>
+
+            <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-slate-400">
+                    <thead className="bg-cinema-900/50 text-slate-200 uppercase text-xs">
+                        <tr>
+                            <th className="px-6 py-3">Article</th>
+                            <th className="px-6 py-3 text-center">Quantité</th>
+                            <th className="px-6 py-3 text-right">Prix Unitaire (Rachat)</th>
+                            <th className="px-6 py-3 text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-cinema-700">
+                        {buybackItems.map(item => (
+                            <tr key={item.id} className="hover:bg-cinema-700/30 transition-colors">
+                                <td className="px-6 py-4 font-medium text-white">
+                                    {item.name}
+                                    <span className="ml-2 px-2 py-0.5 rounded bg-cinema-900 border border-cinema-700 text-xs text-slate-500">{item.department}</span>
+                                </td>
+                                <td className="px-6 py-4 text-center font-mono">{item.quantityCurrent.toString()} {item.unit}</td>
+                                <td className="px-6 py-4 text-right font-mono text-emerald-400 font-bold">{item.buybackPrice.toFixed(2)} €</td>
+                                <td className="px-6 py-4 text-right font-mono text-white font-bold">{(item.buybackPrice * item.quantityCurrent).toFixed(2)} €</td>
+                            </tr>
+                        ))}
+                        {buybackItems.length === 0 && (
+                            <tr>
+                                <td colSpan={4} className="px-6 py-12 text-center text-slate-500">
+                                    Aucun article vendu à A Better Set pour le moment.
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                    <tfoot className="bg-cinema-900/80 font-bold text-white border-t-2 border-cinema-600">
+                        <tr>
+                            <td colSpan={3} className="px-6 py-4 text-right uppercase text-xs tracking-wider text-slate-400">Total Récupéré</td>
+                            <td className="px-6 py-4 text-right text-emerald-400 text-lg">{totalAmount.toFixed(2)} €</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
         </div>
     );
 };

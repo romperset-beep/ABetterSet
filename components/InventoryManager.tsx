@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { ItemStatus, SurplusAction, Department } from '../types';
+import { ItemStatus, SurplusAction, Department, Transaction } from '../types';
 import { Minus, Plus, ShoppingCart, CheckCircle2, PlusCircle, RefreshCw, GraduationCap, Undo2, Mail, PackageCheck, PackageOpen, Clock, Receipt, Film, Trash2, AlertTriangle, ArrowRightLeft } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 import { AddItemModal } from './AddItemModal';
 import { ExpenseReportModal } from './ExpenseReportModal';
 import { ErrorBoundary } from './ErrorBoundary';
+import { db } from '../services/firebase';
+import { collection, addDoc, doc, updateDoc, increment } from 'firebase/firestore';
 
 
 export const InventoryManager: React.FC = () => {
-    const { project, setProject, currentDept, addNotification, user, markNotificationAsReadByItemId, updateItem, addItem } = useProject();
+    const { project, setProject, currentDept, addNotification, user, markNotificationAsReadByItemId, updateItem, addItem, getGlobalMarketplaceItems } = useProject();
 
     // Form State
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -39,6 +41,25 @@ export const InventoryManager: React.FC = () => {
 
 
     // toggleExpenseSelection removed
+
+    // Marketplace Suggestions
+    const [marketplaceItems, setMarketplaceItems] = useState<any[]>([]);
+    const [suggestionsLoading, setSuggestionsLoading] = useState(true);
+
+    React.useEffect(() => {
+        const fetchMarketplace = async () => {
+            setSuggestionsLoading(true);
+            try {
+                const items = await getGlobalMarketplaceItems();
+                setMarketplaceItems(items);
+            } catch (error) {
+                console.error("Failed to load marketplace suggestions", error);
+            } finally {
+                setSuggestionsLoading(false);
+            }
+        };
+        fetchMarketplace();
+    }, [getGlobalMarketplaceItems]);
 
 
     const toggleExpenseSelection = (id: string) => {
@@ -490,6 +511,114 @@ export const InventoryManager: React.FC = () => {
         return acc;
     }, {} as Record<string, typeof project.items>);
 
+    // Calculate Marketplace Opportunities
+    const opportunities = React.useMemo(() => {
+        if (!marketplaceItems.length || !visibleRequests.length) return [];
+
+        const matches: any[] = [];
+
+        visibleRequests.forEach(neededItem => {
+            // Find in marketplace by Name (Case Insensitive)
+            // AND ensure it's not our own item
+            const marketMatches = marketplaceItems.filter(m =>
+                m.name.toLowerCase().trim() === neededItem.name.toLowerCase().trim() &&
+                m.projectId !== project.id
+            );
+
+            if (marketMatches.length > 0) {
+                // Sort by price ascending (cheapest first)
+                marketMatches.sort((a: any, b: any) => (a.price || 0) - (b.price || 0));
+                const bestMatch = marketMatches[0];
+
+                matches.push({
+                    neededItem,
+                    marketItem: bestMatch,
+                    saving: (neededItem.price || 0) - (bestMatch.price || 0),
+                    cost: bestMatch.price || 0
+                });
+            }
+        });
+
+        return matches;
+    }, [marketplaceItems, visibleRequests, project.id]);
+
+    const opportunityCosts = React.useMemo(() => {
+        let prod = 0;
+        let regie = 0;
+
+        opportunities.forEach(op => {
+            // Determine quantity needed (up to what's available)
+            const quantityToBuy = Math.min(op.neededItem.quantityInitial, op.marketItem.quantityCurrent);
+            const cost = (op.marketItem.price || 0) * quantityToBuy;
+
+            if (op.neededItem.department === 'PRODUCTION') prod += cost;
+            else regie += cost; // Assign others to Regie as per request logic approximation (or just non-prod)
+        });
+        return { prod, regie };
+    }, [opportunities]);
+
+    const handleDirectOrder = async (op: { neededItem: any, marketItem: any }) => {
+        if (!user) return;
+        const confirmMsg = `Voulez-vous commander "${op.marketItem.name}" à ${op.marketItem.productionName} pour ${op.marketItem.price} € ?`;
+        if (!window.confirm(confirmMsg)) return;
+
+        try {
+            // 1. Create Transaction
+            const qtyToBuy = Math.min(op.neededItem.quantityInitial, op.marketItem.quantityCurrent);
+
+            const transactionData: Omit<Transaction, 'id'> = {
+                sellerId: op.marketItem.projectId,
+                sellerName: op.marketItem.productionName || 'Unknown Production',
+                buyerId: project.id,
+                buyerName: project.productionCompany || project.name || 'Unknown Buyer',
+                items: [{
+                    id: op.marketItem.id,
+                    name: op.marketItem.name,
+                    quantity: qtyToBuy,
+                    price: op.marketItem.price || 0
+                }],
+                totalAmount: (op.marketItem.price || 0) * qtyToBuy,
+                status: 'PENDING',
+                createdAt: new Date().toISOString()
+            };
+
+            await addDoc(collection(db, 'transactions'), transactionData);
+
+            // 2. Decrement Seller Stock (Direct Firestore)
+            await updateDoc(doc(db, 'projects', op.marketItem.projectId, 'items', op.marketItem.id), {
+                quantityCurrent: increment(-qtyToBuy)
+            });
+
+            // 3. Update Local Request to "Ordered"
+            if (updateItem) {
+                await updateItem({
+                    id: op.neededItem.id,
+                    isBought: true,
+                    price: op.marketItem.price,
+                    originalPrice: op.marketItem.price,
+                    quantityCurrent: qtyToBuy // Update stock with bought quantity
+                });
+            }
+
+            addNotification(
+                `Commande envoyée à ${op.marketItem.productionName}`,
+                'SUCCESS'
+            );
+
+            // Quick fix to update UI
+            setMarketplaceItems(prev => prev.map(p => {
+                if (p.id === op.marketItem.id) {
+                    return { ...p, quantityCurrent: p.quantityCurrent - qtyToBuy };
+                }
+                return p;
+            }).filter(p => p.quantityCurrent > 0));
+
+        } catch (error: any) {
+            console.error("error", error);
+            addNotification("Erreur commande: " + error.message, 'ERROR');
+        }
+    };
+
     return (
         <div className="space-y-8">
             <header className="flex justify-between items-end">
@@ -690,6 +819,70 @@ export const InventoryManager: React.FC = () => {
                                 Valider la mise en vente
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* SECTION: MARKETPLACE OPPORTUNITIES */}
+            {opportunities.length > 0 && (
+                <div className="bg-gradient-to-r from-emerald-900/50 to-teal-900/50 rounded-xl border border-emerald-500/30 overflow-hidden mb-8 animate-in slide-in-from-top-4 shadow-2xl shadow-emerald-900/20">
+                    <div className="px-6 py-4 border-b border-emerald-500/30 flex flex-col md:flex-row justify-between items-center bg-emerald-900/20 gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-emerald-500/20 rounded-lg text-emerald-400 animate-pulse">
+                                <RefreshCw className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                    Disponible sur A Better Set
+                                    <span className="text-xs bg-emerald-500 text-black px-2 py-0.5 rounded-full font-bold">ECO</span>
+                                </h3>
+                                <p className="text-xs text-emerald-200/70">
+                                    {opportunities.length} articles de votre liste sont disponibles en seconde main !
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="divide-y divide-emerald-500/10">
+                        {opportunities.map((op, idx) => (
+                            <div key={idx} className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4 bg-emerald-900/10 hover:bg-emerald-900/20 transition-colors">
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="font-bold text-white">{op.neededItem.name}</span>
+                                        <span className="text-xs bg-cinema-900 text-slate-400 px-2 py-0.5 rounded">
+                                            {op.neededItem.department}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-emerald-200/60 flex items-center gap-2">
+                                        <span className="line-through text-slate-600">Neuf ?</span>
+                                        <span>👉 Dispo chez <strong className="text-white">{op.marketItem.productionName || "Une autre prod"}</strong> ({op.marketItem.quantityCurrent} dispo)</span>
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <div className="text-right">
+                                        <div className="font-bold text-emerald-400 text-lg">{op.marketItem.price} €</div>
+                                        <div className="text-xs text-emerald-600">l'unité</div>
+                                    </div>
+                                    {op.neededItem.isBought ? (
+                                        <button
+                                            disabled
+                                            className="px-4 py-2 bg-emerald-900/50 border border-emerald-500/30 text-emerald-400 rounded-lg text-sm font-bold flex items-center gap-2 cursor-not-allowed"
+                                        >
+                                            <CheckCircle2 className="h-4 w-4" />
+                                            Commandé
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => handleDirectOrder(op)}
+                                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-bold shadow-lg shadow-emerald-900/20 transition-all flex items-center gap-2 group"
+                                        >
+                                            <ShoppingCart className="h-4 w-4 group-hover:scale-110 transition-transform" />
+                                            Commander sur A Better Set
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}
