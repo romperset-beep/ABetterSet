@@ -37,11 +37,15 @@ export const PendingApprovalScreen: React.FC = () => {
                 </div>
 
                 <div className="space-y-4">
+                    <p className="text-sm text-green-400 font-medium animate-pulse">
+                        Cette page se rafraîchira automatiquement dès validation.
+                    </p>
+
                     <button
                         onClick={() => window.location.reload()}
-                        className="w-full bg-eco-600 hover:bg-eco-500 text-white font-bold py-3 rounded-lg transition-all"
+                        className="w-full bg-eco-600 hover:bg-eco-500 text-white font-bold py-3 rounded-lg transition-all opacity-80"
                     >
-                        J'ai été validé (Rafraîchir)
+                        J'ai été validé (Rafraîchir manuellement)
                     </button>
 
                     <button

@@ -715,6 +715,8 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Auth State Listener
   useEffect(() => {
+    let profileUnsubscribe: (() => void) | null = null;
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         console.log("Auth State: Logged In", firebaseUser.uid);
@@ -723,16 +725,24 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         if (!firebaseUser.emailVerified) {
           console.log("Auth: User email not verified. Blocking access.");
           setUser(null);
+          if (profileUnsubscribe) profileUnsubscribe();
           return;
         }
 
-        // Fetch User Profile from Firestore
+        // Real-time Listener for User Profile
         const userRef = doc(db, 'users', firebaseUser.uid);
-        try {
-          const userSnap = await getDoc(userRef);
+
+        // Clean up previous listener if any (e.g. user switch)
+        if (profileUnsubscribe) profileUnsubscribe();
+
+        profileUnsubscribe = onSnapshot(userRef, async (userSnap) => {
           if (userSnap.exists()) {
             const userData = userSnap.data() as User;
-            setUser(userData);
+            const fullUser = { ...userData, id: userSnap.id };
+            setUser(fullUser);
+
+            // Persist to localStorage for faster hydration on reload
+            localStorage.setItem('aBetterSetUser', JSON.stringify(fullUser));
 
             // Security: Enforce View restriction for non-production users
             if (userData.department !== 'PRODUCTION') {
@@ -750,36 +760,37 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
               productionName: 'Demo Prod',
               filmTitle: 'Demo Film',
               status: firebaseUser.email === 'romain.perset@abatterset.com' ? 'approved' : 'pending',
-              isAdmin: firebaseUser.email === 'romain.perset@abatterset.com'
+              isAdmin: firebaseUser.email === 'romain.perset@abatterset.com',
+              id: firebaseUser.uid // Ensure ID is set
             };
 
             await setDoc(userRef, recoveredUser);
-            setUser(recoveredUser);
-            addNotification("Profil récupéré automatiquement", "INFO", "PRODUCTION");
+            // The listener will catch this update immediately
           }
-        } catch (e) {
-          console.error("Error fetching user profile", e);
-        }
+        }, (error) => {
+          console.error("Error listening to user profile:", error);
+          setError("Erreur de synchronisation du profil.");
+        });
+
       } else {
         console.log("Auth State: Logged Out");
         setUser(null);
         setProject(DEFAULT_PROJECT);
+        if (profileUnsubscribe) profileUnsubscribe();
+        localStorage.removeItem('aBetterSetUser');
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (profileUnsubscribe) profileUnsubscribe();
+    };
   }, []);
 
   const refreshUser = async () => {
     if (auth.currentUser) {
       await auth.currentUser.reload();
-      if (auth.currentUser.emailVerified) {
-        const userRef = doc(db, 'users', auth.currentUser.uid);
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) {
-          setUser(userSnap.data() as User);
-        }
-      }
+      // Profile is auto-synced via onSnapshot in useEffect
     }
   };
 
