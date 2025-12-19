@@ -4,10 +4,9 @@ import { Recycle, Heart, ShoppingBag, ArrowRight, Check, LayoutDashboard, Refres
 import { useProject } from '../context/ProjectContext';
 
 export const CircularEconomy: React.FC = () => {
-    const { project, setProject, circularView: view, setCircularView: setView, addNotification, user } = useProject();
+    const { project, setProject, circularView: view, setCircularView: setView, addNotification, user, updateItem, addItem } = useProject();
     const [transferModal, setTransferModal] = React.useState<{ item: any, quantity: number } | null>(null);
 
-    // All items that have leftover quantity
     // All items that have leftover quantity (filtered by department)
     const totalSurplusItems = project.items.filter(item => {
         const hasQuantity = item.quantityCurrent > 0;
@@ -21,7 +20,8 @@ export const CircularEconomy: React.FC = () => {
     const donationItems = totalSurplusItems.filter(item => item.surplusAction === SurplusAction.DONATION);
     const shortFilmItems = totalSurplusItems.filter(item => item.surplusAction === SurplusAction.SHORT_FILM);
 
-    const setAction = (id: string, action: SurplusAction) => {
+    const setAction = async (id: string, action: SurplusAction) => {
+        // Optimistic Update
         setProject(prev => {
             const item = prev.items.find(i => i.id === id);
             if (item && action !== SurplusAction.NONE) {
@@ -37,8 +37,27 @@ export const CircularEconomy: React.FC = () => {
                 items: prev.items.map(item => item.id === id ? { ...item, surplusAction: action } : item)
             };
         });
+
+        // Persistence
+        try {
+            const item = project.items.find(i => i.id === id);
+            if (item && updateItem) {
+                const changes: any = { surplusAction: action };
+                // Fix for undefined price when moving to Marketplace
+                if (action === SurplusAction.MARKETPLACE) {
+                    // Start with 0 if undefined
+                    if (!item.originalPrice) changes.originalPrice = item.price ?? 0;
+                    if (item.price === undefined) changes.price = 0;
+                }
+                await updateItem({ id, ...changes });
+            }
+        } catch (err: any) {
+            console.error("Error updating surplus action:", err);
+            alert(`Erreur sauvegarde : ${err.message}`);
+        }
     };
 
+    // ... groupItemsForDisplay (unchanged) ...
 
     const groupItemsForDisplay = (items: typeof project.items) => {
         const grouped: any[] = [];
@@ -99,7 +118,7 @@ export const CircularEconomy: React.FC = () => {
         setTransferModal({ item, quantity: 1 });
     };
 
-    const confirmTransfer = () => {
+    const confirmTransfer = async () => {
         if (!transferModal) return;
         const { item, quantity } = transferModal;
 
@@ -108,20 +127,20 @@ export const CircularEconomy: React.FC = () => {
             setAction(item.id, SurplusAction.DONATION);
         } else {
             // Split logic
-            setProject(prev => {
-                const remainingQty = item.quantityCurrent - quantity;
+            const newItemId = `${item.id}_donation_${Date.now()}`;
+            const remainingQty = item.quantityCurrent - quantity;
 
-                // 1. Update original item (keep remaining in Marketplace)
+            // Optimistic
+            setProject(prev => {
                 const updatedItems = prev.items.map(i =>
                     i.id === item.id
                         ? { ...i, quantityCurrent: remainingQty }
                         : i
                 );
 
-                // 2. Create new item (send quantity to Donation)
                 const newItem = {
                     ...item,
-                    id: `${item.id}_donation_${Date.now()}`,
+                    id: newItemId,
                     quantityCurrent: quantity,
                     quantityInitial: quantity,
                     surplusAction: SurplusAction.DONATION
@@ -135,6 +154,29 @@ export const CircularEconomy: React.FC = () => {
 
                 return { ...prev, items: [...updatedItems, newItem] };
             });
+
+            // Persistence
+            try {
+                if (updateItem) await updateItem({ id: item.id, quantityCurrent: remainingQty });
+                if (addItem) {
+                    await addItem({
+                        ...item,
+                        id: newItemId,
+                        quantityCurrent: quantity,
+                        quantityInitial: quantity,
+                        // Ensure required fields
+                        quantityStarted: item.quantityStarted ? Math.min(item.quantityStarted, quantity) : 0,
+                        surplusAction: SurplusAction.DONATION,
+                        purchased: true,
+                        isBought: false,
+                        originalPrice: item.originalPrice ?? item.price ?? 0,
+                        price: item.price ?? 0
+                    });
+                }
+            } catch (err: any) {
+                console.error("Error splitting donation:", err);
+                alert(`Erreur split : ${err.message}`);
+            }
         }
         setTransferModal(null);
     };
@@ -232,8 +274,6 @@ export const CircularEconomy: React.FC = () => {
 
     const [editingItem, setEditingItem] = React.useState<any | null>(null);
     const [editForm, setEditForm] = React.useState({ price: 0 });
-
-    const { updateItem } = useProject(); // Ensure updateItem is available
 
     const handleEditClick = (item: any) => {
         setEditingItem(item);
@@ -517,6 +557,9 @@ export const CircularEconomy: React.FC = () => {
                                         <div className="flex items-center gap-3 text-sm text-slate-400 mt-1">
                                             <span className="bg-cinema-900 px-2 py-0.5 rounded border border-cinema-700 text-xs">{item.department}</span>
                                             <span>{item.status}</span>
+                                            <span className="text-xs font-mono text-slate-500 border border-cinema-800 px-2 py-0.5 rounded ml-2">
+                                                {item.price !== undefined ? `${item.price} €` : '0 €'}
+                                            </span>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-6">
@@ -596,6 +639,9 @@ export const CircularEconomy: React.FC = () => {
                                         <div className="flex items-center gap-3 text-sm text-slate-400 mt-1">
                                             <span className="bg-cinema-900 px-2 py-0.5 rounded border border-cinema-700 text-xs">{item.department}</span>
                                             <span>{item.status}</span>
+                                            <span className="text-xs font-mono text-slate-500 border border-cinema-800 px-2 py-0.5 rounded ml-2">
+                                                {item.price !== undefined ? `${item.price} €` : '0 €'}
+                                            </span>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-6">
@@ -658,6 +704,9 @@ export const CircularEconomy: React.FC = () => {
                                         <div className="flex items-center gap-3 text-sm text-slate-400 mt-1">
                                             <span className="bg-cinema-900 px-2 py-0.5 rounded border border-cinema-700 text-xs">{item.department}</span>
                                             <span>{item.status}</span>
+                                            <span className="text-xs font-mono text-slate-500 border border-cinema-800 px-2 py-0.5 rounded ml-2">
+                                                {item.price !== undefined ? `${item.price} €` : '0 €'}
+                                            </span>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-6">
