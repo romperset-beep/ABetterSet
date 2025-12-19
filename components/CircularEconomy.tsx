@@ -5,7 +5,7 @@ import { useProject } from '../context/ProjectContext';
 
 export const CircularEconomy: React.FC = () => {
     const { project, setProject, circularView: view, setCircularView: setView, addNotification, user, updateItem, addItem } = useProject();
-    const [transferModal, setTransferModal] = React.useState<{ item: any, quantity: number } | null>(null);
+    const [transferModal, setTransferModal] = React.useState<{ item: any, quantity: number, targetAction: SurplusAction } | null>(null);
 
     // All items that have leftover quantity (filtered by department)
     const totalSurplusItems = project.items.filter(item => {
@@ -114,21 +114,22 @@ export const CircularEconomy: React.FC = () => {
             return 0;
         });
     };
-    const handleTransferClick = (item: any) => {
-        setTransferModal({ item, quantity: 1 });
+    const handleTransferClick = (item: any, targetAction: SurplusAction) => {
+        setTransferModal({ item, quantity: 1, targetAction });
     };
 
     const confirmTransfer = async () => {
         if (!transferModal) return;
-        const { item, quantity } = transferModal;
+        const { item, quantity, targetAction } = transferModal;
 
         if (quantity >= item.quantityCurrent) {
             // Move everything
-            setAction(item.id, SurplusAction.DONATION);
+            setAction(item.id, targetAction);
         } else {
             // Split logic
-            const newItemId = `${item.id}_donation_${Date.now()}`;
+            const newItemId = `${item.id}_${targetAction === SurplusAction.SHORT_FILM ? 'short' : 'donation'}_${Date.now()}`;
             const remainingQty = item.quantityCurrent - quantity;
+            const actionName = targetAction === SurplusAction.SHORT_FILM ? 'Court-Métrage' : 'Dons';
 
             // Optimistic
             setProject(prev => {
@@ -143,11 +144,11 @@ export const CircularEconomy: React.FC = () => {
                     id: newItemId,
                     quantityCurrent: quantity,
                     quantityInitial: quantity,
-                    surplusAction: SurplusAction.DONATION
+                    surplusAction: targetAction
                 };
 
                 addNotification(
-                    `♻️ Don Partiel : ${item.name} (${quantity} unités) envoyé aux écoles`,
+                    `♻️ Transfert Partiel : ${item.name} (${quantity} unités) vers ${actionName}`,
                     'STOCK_MOVE',
                     'PRODUCTION'
                 );
@@ -166,7 +167,7 @@ export const CircularEconomy: React.FC = () => {
                         quantityInitial: quantity,
                         // Ensure required fields
                         quantityStarted: item.quantityStarted ? Math.min(item.quantityStarted, quantity) : 0,
-                        surplusAction: SurplusAction.DONATION,
+                        surplusAction: targetAction,
                         purchased: true,
                         isBought: false,
                         originalPrice: item.originalPrice ?? item.price ?? 0,
@@ -174,7 +175,7 @@ export const CircularEconomy: React.FC = () => {
                     });
                 }
             } catch (err: any) {
-                console.error("Error splitting donation:", err);
+                console.error("Error splitting item:", err);
                 alert(`Erreur split : ${err.message}`);
             }
         }
@@ -339,7 +340,9 @@ export const CircularEconomy: React.FC = () => {
             {transferModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <div className="bg-cinema-800 border border-cinema-700 rounded-xl p-6 max-w-md w-full shadow-2xl">
-                        <h3 className="text-xl font-bold text-white mb-4">Donner aux Écoles</h3>
+                        <h3 className="text-xl font-bold text-white mb-4">
+                            {transferModal.targetAction === SurplusAction.SHORT_FILM ? 'Donner au Court-Métrage' : 'Donner aux Écoles'}
+                        </h3>
                         <p className="text-slate-300 mb-6">
                             Combien d'unités de <strong>{transferModal.item.name}</strong> souhaitez-vous donner ?
                         </p>
@@ -505,7 +508,7 @@ export const CircularEconomy: React.FC = () => {
                                                         </button>
                                                         {user?.department === 'PRODUCTION' && (
                                                             <button
-                                                                onClick={() => setAction(item.id, SurplusAction.DONATION)}
+                                                                onClick={() => handleTransferClick(item, SurplusAction.DONATION)}
                                                                 className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all border border-cinema-600 text-slate-400 hover:border-purple-500 hover:text-purple-400 hover:bg-purple-500/10"
                                                             >
                                                                 <GraduationCap className="h-3 w-3" />
@@ -514,7 +517,7 @@ export const CircularEconomy: React.FC = () => {
                                                         )}
                                                         {user?.department === 'PRODUCTION' && (
                                                             <button
-                                                                onClick={() => setAction(item.id, SurplusAction.SHORT_FILM)}
+                                                                onClick={() => handleTransferClick(item, SurplusAction.SHORT_FILM)}
                                                                 className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all border border-cinema-600 text-slate-400 hover:border-orange-500 hover:text-orange-400 hover:bg-orange-500/10"
                                                             >
                                                                 <Film className="h-3 w-3" />
@@ -584,7 +587,7 @@ export const CircularEconomy: React.FC = () => {
                                         </div>
                                         {user?.department === 'PRODUCTION' && (
                                             <button
-                                                onClick={() => handleTransferClick(item)}
+                                                onClick={() => handleTransferClick(item, SurplusAction.DONATION)}
                                                 className="p-2 text-purple-500 hover:text-purple-300 hover:bg-purple-500/20 rounded-full transition-colors"
                                                 title="Transférer vers Dons"
                                             >
@@ -593,7 +596,7 @@ export const CircularEconomy: React.FC = () => {
                                         )}
                                         {user?.department === 'PRODUCTION' && (
                                             <button
-                                                onClick={() => setAction(item.id, SurplusAction.SHORT_FILM)}
+                                                onClick={() => handleTransferClick(item, SurplusAction.SHORT_FILM)}
                                                 className="p-2 text-orange-500 hover:text-orange-300 hover:bg-orange-500/20 rounded-full transition-colors"
                                                 title="Transférer vers Court-Métrage"
                                             >
@@ -658,7 +661,7 @@ export const CircularEconomy: React.FC = () => {
                                         </button>
                                         {user?.department === 'PRODUCTION' && (
                                             <button
-                                                onClick={() => setAction(item.id, SurplusAction.SHORT_FILM)}
+                                                onClick={() => handleTransferClick(item, SurplusAction.SHORT_FILM)}
                                                 className="p-2 text-orange-500 hover:text-orange-300 hover:bg-orange-500/20 rounded-full transition-colors"
                                                 title="Transférer vers Court-Métrage"
                                             >
