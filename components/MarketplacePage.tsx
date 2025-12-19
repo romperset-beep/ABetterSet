@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useProject } from '../context/ProjectContext';
 import { ShoppingBag, Tag, Search, Filter, Globe, ExternalLink, Plus } from 'lucide-react';
-import { ConsumableItem, SurplusAction } from '../types';
+import { ConsumableItem, SurplusAction, Department, ItemStatus } from '../types';
 import { SellItemModal } from './SellItemModal'; // Added
 
 // Extended interface to include Project ID (added in Context query)
@@ -36,7 +36,8 @@ export const MarketplacePage: React.FC = () => {
         fetchItems();
     }, [getGlobalMarketplaceItems, isSellModalOpen]);
 
-    const categories = ['all', ...Array.from(new Set(items.map(i => i.department).filter(Boolean)))];
+    // Use all defined departments for filtering, plus 'PRODUCTION'
+    const categories = ['all', ...Object.values(Department), 'PRODUCTION'];
 
     const filteredItems = items.filter(item => {
         const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -184,11 +185,11 @@ export const MarketplacePage: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
                     <Filter className="text-slate-500 h-5 w-5 mr-2" />
-                    {categories.map(cat => (
+                    {categories.map((cat: string | Department) => (
                         <button
-                            key={cat}
-                            onClick={() => setSelectedCategory(cat)}
-                            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${selectedCategory === cat
+                            key={String(cat)}
+                            onClick={() => setSelectedCategory(String(cat))}
+                            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${selectedCategory === String(cat)
                                 ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
                                 : 'bg-cinema-900 text-slate-400 hover:bg-cinema-700 hover:text-white'
                                 }`}
@@ -262,7 +263,7 @@ export const MarketplacePage: React.FC = () => {
                                     <div className="pt-2">
                                         {/* Status moved here */}
                                         <div className="flex flex-wrap gap-2">
-                                            {item.status === 'SOLD' ? (
+                                            {item.status === ItemStatus.SOLD ? (
                                                 <span className="text-xs px-2 py-1 bg-red-500/20 text-red-400 rounded-md border border-red-500/30 uppercase font-bold">
                                                     Vendu
                                                 </span>

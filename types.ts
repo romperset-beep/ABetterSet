@@ -28,7 +28,8 @@ export interface Notification {
 export enum ItemStatus {
   NEW = 'Neuf',
   USED = 'Entamé',
-  EMPTY = 'Vide'
+  EMPTY = 'Vide',
+  SOLD = 'Vendu'
 }
 
 export enum SurplusAction {
