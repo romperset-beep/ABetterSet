@@ -59,7 +59,7 @@ const MOCK_GLOBAL_STOCK = [
 ];
 
 export const GlobalStock: React.FC = () => {
-    const { project, setProject, user } = useProject();
+    const { project, setProject, user, updateItem } = useProject();
     const [mockItems, setMockItems] = React.useState(MOCK_GLOBAL_STOCK);
     const [editingItem, setEditingItem] = React.useState<any | null>(null);
     const [editForm, setEditForm] = React.useState({ price: 0, quantity: 0 });
@@ -69,7 +69,7 @@ export const GlobalStock: React.FC = () => {
         setEditForm({ price: item.price, quantity: item.quantity });
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!editingItem) return;
 
         if (editingItem.id.startsWith('g')) {
@@ -77,6 +77,17 @@ export const GlobalStock: React.FC = () => {
             setMockItems(prev => prev.map(i => i.id === editingItem.id ? { ...i, ...editForm } : i));
         } else {
             // Real Project Item
+            // 1. Update Firestore
+            if (updateItem) {
+                await updateItem({
+                    id: editingItem.id,
+                    quantityCurrent: editForm.quantity,
+                    price: editForm.price
+                    // status is likely unchanged unless logic requires it
+                });
+            }
+
+            // 2. Update Local State (Optimistic or fallback)
             setProject(prev => ({
                 ...prev,
                 items: prev.items.map(i => i.id === editingItem.id ? { ...i, quantityCurrent: editForm.quantity, price: editForm.price } : i)
@@ -85,7 +96,7 @@ export const GlobalStock: React.FC = () => {
         setEditingItem(null);
     };
 
-    const handleDelete = () => {
+    const handleDelete = async () => {
         if (!editingItem) return;
 
         if (editingItem.id.startsWith('g')) {
@@ -93,6 +104,13 @@ export const GlobalStock: React.FC = () => {
             setMockItems(prev => prev.filter(i => i.id !== editingItem.id));
         } else {
             // Real Project Item - Remove from Marketplace (set SurplusAction to NONE)
+            if (updateItem) {
+                await updateItem({
+                    id: editingItem.id,
+                    surplusAction: SurplusAction.NONE
+                });
+            }
+
             setProject(prev => ({
                 ...prev,
                 items: prev.items.map(i => i.id === editingItem.id ? { ...i, surplusAction: SurplusAction.NONE } : i)
