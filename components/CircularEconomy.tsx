@@ -1,6 +1,6 @@
 import React from 'react';
 import { SurplusAction, ItemStatus } from '../types';
-import { Recycle, Heart, ShoppingBag, ArrowRight, Check, LayoutDashboard, RefreshCw, GraduationCap, Box, Undo2 , Film } from 'lucide-react';
+import { Recycle, Heart, ShoppingBag, ArrowRight, Check, LayoutDashboard, RefreshCw, GraduationCap, Box, Undo2, Film, Edit2 } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 
 export const CircularEconomy: React.FC = () => {
@@ -8,7 +8,7 @@ export const CircularEconomy: React.FC = () => {
     const [transferModal, setTransferModal] = React.useState<{ item: any, quantity: number } | null>(null);
 
     // All items that have leftover quantity
-        // All items that have leftover quantity (filtered by department)
+    // All items that have leftover quantity (filtered by department)
     const totalSurplusItems = project.items.filter(item => {
         const hasQuantity = item.quantityCurrent > 0;
         const isMyDept = user?.department === 'PRODUCTION' || item.department === user?.department;
@@ -39,7 +39,7 @@ export const CircularEconomy: React.FC = () => {
         });
     };
 
-    
+
     const groupItemsForDisplay = (items: typeof project.items) => {
         const grouped: any[] = [];
         const newItemsByName: Record<string, any> = {};
@@ -53,11 +53,11 @@ export const CircularEconomy: React.FC = () => {
             // Handle New Portion
             if (newQty > 0) {
                 if (!newItemsByName[item.name]) {
-                    newItemsByName[item.name] = { 
-                        ...item, 
-                        quantityCurrent: 0, 
+                    newItemsByName[item.name] = {
+                        ...item,
+                        quantityCurrent: 0,
                         quantityStarted: 0, // Force 0 for new
-                        items: [] 
+                        items: []
                     };
                 }
                 newItemsByName[item.name].quantityCurrent += newQty;
@@ -67,11 +67,11 @@ export const CircularEconomy: React.FC = () => {
             // Handle Started Portion
             if (startedQty > 0) {
                 if (!startedItemsByName[item.name]) {
-                    startedItemsByName[item.name] = { 
-                        ...item, 
-                        quantityCurrent: 0, 
-                        quantityStarted: 0, 
-                        items: [] 
+                    startedItemsByName[item.name] = {
+                        ...item,
+                        quantityCurrent: 0,
+                        quantityStarted: 0,
+                        items: []
                     };
                 }
                 startedItemsByName[item.name].quantityCurrent += startedQty;
@@ -179,7 +179,7 @@ export const CircularEconomy: React.FC = () => {
                             <span className="font-bold">Articles en Stock Virtuel</span>
                         </div>
                     </div>
-                    
+
                     <div className="divide-y divide-cinema-700">
                         {marketItems.length === 0 ? (
                             <div className="p-12 text-center text-slate-500 flex flex-col items-center">
@@ -229,6 +229,35 @@ export const CircularEconomy: React.FC = () => {
             </div>
         );
     }
+
+    const [editingItem, setEditingItem] = React.useState<any | null>(null);
+    const [editForm, setEditForm] = React.useState({ price: 0 });
+
+    const { updateItem } = useProject(); // Ensure updateItem is available
+
+    const handleEditClick = (item: any) => {
+        setEditingItem(item);
+        setEditForm({ price: item.price || 0 });
+    };
+
+    const handleSavePrice = async () => {
+        if (!editingItem) return;
+
+        // Optimistic update
+        setProject(prev => ({
+            ...prev,
+            items: prev.items.map(i => i.id === editingItem.id ? { ...i, price: editForm.price } : i)
+        }));
+
+        // Persist
+        if (updateItem) {
+            await updateItem({
+                id: editingItem.id,
+                price: editForm.price
+            });
+        }
+        setEditingItem(null);
+    };
 
     return (
         <div className="space-y-6">
@@ -306,6 +335,39 @@ export const CircularEconomy: React.FC = () => {
                                 className="flex-1 py-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold shadow-lg shadow-purple-900/20 transition-all"
                             >
                                 Valider le Don
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Price Edit Modal */}
+            {editingItem && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-cinema-800 border border-cinema-700 rounded-xl p-6 max-w-sm w-full shadow-2xl">
+                        <h3 className="text-xl font-bold text-white mb-4">Définir un prix de vente</h3>
+                        <div className="mb-6">
+                            <label className="block text-xs font-medium text-slate-400 uppercase mb-1">Prix Unitaire (€)</label>
+                            <input
+                                type="number"
+                                min="0"
+                                value={editForm.price}
+                                onChange={(e) => setEditForm({ price: parseFloat(e.target.value) || 0 })}
+                                className="w-full bg-cinema-900 border border-cinema-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none text-lg font-bold"
+                            />
+                        </div>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setEditingItem(null)}
+                                className="flex-1 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-cinema-700 transition-colors"
+                            >
+                                Annuler
+                            </button>
+                            <button
+                                onClick={handleSavePrice}
+                                className="flex-1 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold transition-colors"
+                            >
+                                Enregistrer
                             </button>
                         </div>
                     </div>
@@ -458,6 +520,21 @@ export const CircularEconomy: React.FC = () => {
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-6">
+                                        {/* PRICE EDIT */}
+                                        <div
+                                            onClick={() => handleEditClick(item)}
+                                            className="text-right cursor-pointer group/price hover:bg-cinema-700/50 p-2 rounded-lg transition-all"
+                                            title="Modifier le prix"
+                                        >
+                                            <div className="text-sm text-slate-400 flex items-center justify-end gap-1">
+                                                Prix
+                                                <Edit2 className="h-3 w-3 opacity-0 group-hover/price:opacity-100 transition-opacity" />
+                                            </div>
+                                            <div className={`text-xl font-bold ${item.price ? 'text-green-400' : 'text-slate-600'}`}>
+                                                {item.price ? `${item.price} €` : '-- €'}
+                                            </div>
+                                        </div>
+
                                         <div className="text-right">
                                             <span className="block text-2xl font-bold text-blue-400">{item.quantityCurrent}</span>
                                             <span className="text-xs text-slate-500 uppercase">{item.unit}</span>
