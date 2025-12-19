@@ -15,7 +15,7 @@ export const AdminDashboard: React.FC = () => {
     const [projectsList, setProjectsList] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const { deleteProject } = useProject();
+    const { deleteProject, deleteUser } = useProject();
 
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editForm, setEditForm] = useState<any>({});
@@ -78,10 +78,11 @@ export const AdminDashboard: React.FC = () => {
     const handleDeleteUser = async (userId: string, userName: string) => {
         if (window.confirm(`Êtes-vous sûr de vouloir supprimer l'utilisateur "${userName}" ?`)) {
             try {
-                await deleteDoc(doc(db, 'users', userId));
+                // Use centralized deleteUser
+                await deleteUser(userId);
                 setUsers(prev => prev.filter(u => (u as any).id !== userId));
             } catch (err: any) {
-                alert(`Erreur: ${err.message}`);
+                alert(`Erreur lors de la suppression: ${err.message}`);
             }
         }
     };

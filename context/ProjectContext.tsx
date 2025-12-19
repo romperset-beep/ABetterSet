@@ -130,6 +130,9 @@ interface ProjectContextType {
   // Search
   searchProjects: (queryStr: string) => Promise<Project[]>;
 
+  // User Management
+  deleteUser: (userId: string) => Promise<void>; // Added
+
   // Social Nav Control
   socialAudience: 'GLOBAL' | 'DEPARTMENT' | 'USER';
   setSocialAudience: (aud: 'GLOBAL' | 'DEPARTMENT' | 'USER') => void;
@@ -1509,6 +1512,22 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     });
   };
 
+  const deleteUser = async (userId: string) => {
+    try {
+      console.log(`[ProjectContext] Deleting user: ${userId}`);
+      const userRef = doc(db, 'users', userId);
+      await deleteDoc(userRef);
+      console.log(`[ProjectContext] User deleted successfully`);
+
+      // Optionally clean up other references? For now, just the user doc.
+      // Note: Authentication user cannot be deleted from Client SDK without their credential.
+      // This only deletes the User Profile in Firestore.
+    } catch (err) {
+      console.error("[ProjectContext] Error deleting user:", err);
+      throw err;
+    }
+  };
+
   const updateUser = async (data: Partial<User>) => {
     if (!user) return;
     const updatedUser = { ...user, ...data };
@@ -1592,7 +1611,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       addLogisticsRequest,
       deleteLogisticsRequest,
       searchProjects, // Added
-
+      deleteUser, // Added
 
       userProfiles,
       updateUserProfile,
