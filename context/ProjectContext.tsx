@@ -192,6 +192,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [error, setError] = useState<string | null>(null);
   const [debugStatus, setDebugStatus] = useState<string>("");
   const [lastLog, setLastLog] = useState<string>("En attente...");
+  const [verificationCheck, setVerificationCheck] = useState(0); // Added to force auth re-check
 
 
   const resetPassword = async (email: string) => {
@@ -822,12 +823,13 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       unsubscribe();
       if (profileUnsubscribe) profileUnsubscribe();
     };
-  }, []);
+  }, [verificationCheck]);
 
   const refreshUser = async () => {
     if (auth.currentUser) {
       await auth.currentUser.reload();
-      // Profile is auto-synced via onSnapshot in useEffect
+      // Force re-run of the Auth Listener to catch the new 'emailVerified' status
+      setVerificationCheck(prev => prev + 1);
     }
   };
 
