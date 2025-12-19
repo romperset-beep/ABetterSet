@@ -526,70 +526,21 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     try {
       if (!user) return [];
 
-      const items: ConsumableItem[] = [];
-
-      // 1. Query 'items' (Surplus from Inventory)
+      // Query 'items' (Surplus from Inventory)
       // This might fail if index is missing. We'll handle it gracefully.
-      const fetchSurplus = async () => {
-        try {
-          const qSurplus = query(
-            collectionGroup(db, 'items'),
-            where('surplusAction', '==', 'MARKETPLACE')
-          );
-          const snap = await getDocs(qSurplus);
-          const results: ConsumableItem[] = [];
-          snap.forEach(doc => results.push({ id: doc.id, ...doc.data() } as ConsumableItem));
-          return results;
-        } catch (error: any) {
-          console.error("Failed to fetch Global Surplus (Index missing?):", error);
-          // If we could notify user about index, we would. For now, return empty.
-          return [];
-        }
-      };
-
-      // 2. Query 'buyBackItems' (Manual Sales)
-      const fetchBuyBack = async () => {
-        try {
-          const qBuyBack = query(collectionGroup(db, 'buyBackItems'));
-          const snap = await getDocs(qBuyBack);
-          const results: ConsumableItem[] = [];
-
-          snap.forEach(doc => {
-            const data = doc.data();
-            // Include AVAILABLE, RESERVED, and SOLD (for history)
-            // User asked: "je ne vois plus les articles vendu" -> They want to see history.
-
-            results.push({
-              id: doc.id,
-              name: data.name,
-              department: data.sellerDepartment,
-              quantityCurrent: 1,
-              unit: 'unité',
-              status: data.status === 'AVAILABLE' ? ItemStatus.USED : (data.status as any), // Map status
-              surplusAction: SurplusAction.MARKETPLACE,
-              purchased: true,
-              price: data.price,
-              photo: data.photo,
-              description: data.description,
-              // Keep original data for specific UI handling if needed
-              ...data
-            } as ConsumableItem);
-          });
-          return results;
-        } catch (error) {
-          console.error("Failed to fetch BuyBack items:", error);
-          return [];
-        }
-      };
-
-      const [surplusItems, buyBackItems] = await Promise.all([
-        fetchSurplus(),
-        fetchBuyBack()
-      ]);
-
-      items.push(...surplusItems, ...buyBackItems);
-
-      return items;
+      try {
+        const qSurplus = query(
+          collectionGroup(db, 'items'),
+          where('surplusAction', '==', 'MARKETPLACE')
+        );
+        const snap = await getDocs(qSurplus);
+        const results: ConsumableItem[] = [];
+        snap.forEach(doc => results.push({ id: doc.id, ...doc.data() } as ConsumableItem));
+        return results;
+      } catch (error: any) {
+        console.error("Failed to fetch Global Surplus (Index missing?):", error);
+        return [];
+      }
     } catch (err) {
       console.error("Error fetching global marketplace:", err);
       return [];

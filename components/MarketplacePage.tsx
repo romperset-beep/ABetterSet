@@ -38,28 +38,21 @@ export const MarketplacePage: React.FC = () => {
     return (
         <div className="space-y-8 animate-in fade-in duration-500 pb-20">
             {/* Header */}
-            <div className="bg-gradient-to-r from-indigo-900 to-purple-900 rounded-3xl p-8 border border-indigo-700/50 relative overflow-hidden shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
-                <div className="relative z-10">
-                    <h1 className="text-4xl font-black text-white mb-2 flex items-center gap-3">
-                        <Globe className="h-10 w-10 text-indigo-400" />
-                        Stock Virtuel Global
-                    </h1>
-                    <p className="text-indigo-200 text-lg max-w-2xl">
-                        Accédez aux surplus de toutes les productions connectées.
-                    </p>
+            <div className="bg-gradient-to-r from-indigo-900 to-purple-900 rounded-2xl p-8 mb-8 shadow-xl border border-indigo-700/50">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                    <div>
+                        <div className="flex items-center gap-3 mb-2">
+                            <Globe className="h-8 w-8 text-indigo-400" />
+                            <h1 className="text-3xl font-bold text-white">Stock Virtuel Global</h1>
+                        </div>
+                        <p className="text-indigo-200 text-lg max-w-2xl">
+                            Accédez aux surplus de toutes les productions connectées.
+                            <br />
+                            <span className="text-sm text-indigo-300 italic">Pour ajouter un article ici, utilisez "Valider vers Stock Virtuel" depuis votre Inventaire.</span>
+                        </p>
+                    </div>
                 </div>
-
-                {/* Sell Button */}
-                <button
-                    onClick={() => setIsSellModalOpen(true)}
-                    className="relative z-10 bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-yellow-500/20 hover:scale-105"
-                >
-                    <Plus className="h-5 w-5" />
-                    Vendre un article
-                </button>
             </div>
-
             {/* Filters */}
             <div className="flex flex-col md:flex-row gap-4 items-center bg-cinema-800 p-4 rounded-xl border border-cinema-700 top-20 sticky z-20 shadow-lg backdrop-blur-md bg-opacity-90">
                 <div className="relative flex-1 w-full">
@@ -95,10 +88,14 @@ export const MarketplacePage: React.FC = () => {
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
                 </div>
             ) : filteredItems.length === 0 ? (
-                <div className="text-center py-20 bg-cinema-800/30 rounded-3xl border border-cinema-700/50 border-dashed">
-                    <ShoppingBag className="h-16 w-16 text-slate-600 mx-auto mb-4" />
-                    <h3 className="text-xl font-bold text-slate-400">Aucun article disponible</h3>
-                    <p className="text-slate-500 mt-2">Essayez de modifier vos critères de recherche.</p>
+                <div className="text-center py-20 bg-cinema-800/30 rounded-2xl border border-cinema-700/50 border-dashed">
+                    <ShoppingBag className="h-16 w-16 text-cinema-600 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold text-cinema-300 mb-2">Aucun article disponible</h3>
+                    <p className="text-cinema-400 max-w-md mx-auto">
+                        Le Stock Virtuel Global est vide pour le moment.
+                        <br />
+                        Les articles de votre inventaire marqués "Stock Virtuel" apparaîtront ici.
+                    </p>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
