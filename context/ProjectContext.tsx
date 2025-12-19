@@ -35,7 +35,8 @@ import {
   arrayUnion,
   where,
   deleteDoc, // Added
-  getDocs // Added
+  getDocs, // Added
+  collectionGroup // Added
 } from 'firebase/firestore';
 
 import { getStorage, ref, deleteObject, uploadString, getDownloadURL } from 'firebase/storage';
@@ -53,6 +54,9 @@ interface ProjectContextType {
   addItem: (item: ConsumableItem) => Promise<void>;
   updateItem: (item: Partial<ConsumableItem> & { id: string }) => Promise<void>;
   deleteItem: (itemId: string) => Promise<void>;
+
+  // Global Market
+  getGlobalMarketplaceItems: () => Promise<ConsumableItem[]>;
 
   currentDept: string;
   setCurrentDept: (dept: string) => void;
@@ -515,6 +519,63 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       console.error("[AddItem] Error:", err);
       setLastLog(`[AddItem] ERREUR: ${err.message}`);
       setError(`Erreur d'ajout : ${err.message}`);
+    }
+  };
+
+  const getGlobalMarketplaceItems = async (): Promise<ConsumableItem[]> => {
+    try {
+      if (!user) return [];
+
+      const items: ConsumableItem[] = [];
+
+      // 1. Query 'items' (Surplus from Inventory)
+      const qSurplus = query(
+        collectionGroup(db, 'items'),
+        where('surplusAction', '==', 'MARKETPLACE')
+      );
+
+      // 2. Query 'buyBackItems' (Manual Sales)
+      // Note: collectionGroup query might fail if permissions/indexes aren't set for buyBackItems yet
+      // We assume basic read rules are open for auth users (we set that in step 1428)
+      const qBuyBack = query(collectionGroup(db, 'buyBackItems'));
+
+      const [snapSurplus, snapBuyBack] = await Promise.all([
+        getDocs(qSurplus),
+        getDocs(qBuyBack)
+      ]);
+
+      // Process Surplus
+      snapSurplus.forEach(doc => {
+        const data = doc.data();
+        items.push({ id: doc.id, ...data } as ConsumableItem);
+      });
+
+      // Process BuyBack (Normalize to ConsumableItem structure)
+      snapBuyBack.forEach(doc => {
+        const data = doc.data();
+        // Skip sold/reserved if we only want available? No, user wants to see everything probably or filter.
+        // Marketplace usually shows Available.
+        if (data.status !== 'AVAILABLE') return;
+
+        items.push({
+          id: doc.id,
+          name: data.name,
+          department: data.sellerDepartment,
+          quantityCurrent: 1, // BuyBack items are usually unique/singular unit unless specified
+          unit: 'unité',
+          status: ItemStatus.USED, // Assume used
+          surplusAction: SurplusAction.MARKETPLACE,
+          purchased: true,
+          price: data.price,
+          // Add specific buyback fields if needed, but for now fit into ConsumableItem generic display
+        } as ConsumableItem);
+      });
+
+      return items;
+    } catch (err) {
+      console.error("Error fetching global marketplace:", err);
+      // Return whatever we managed to get or empty
+      return [];
     }
   };
 
@@ -1585,6 +1646,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       deleteProject, // Added
       removeProjectFromHistory, // Added
       addItem,
+      getGlobalMarketplaceItems,
       updateItem,
       deleteItem,
       currentDept,

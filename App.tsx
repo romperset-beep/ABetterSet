@@ -21,6 +21,7 @@ import { LoginPage } from './components/LoginPage';
 import { ProjectSelection } from './components/ProjectSelection';
 import { ProjectConfigurationModal } from './components/ProjectConfigurationModal';
 import { AdminDashboard } from './components/AdminDashboard';
+import { MarketplacePage } from './components/MarketplacePage'; // Added
 import { PendingApprovalScreen } from './components/PendingApprovalScreen';
 import { FallbackErrorBoundary } from './components/FallbackErrorBoundary';
 import { DebugFooter } from './components/DebugFooter';
@@ -179,7 +180,7 @@ const AppContent: React.FC = () => {
       case 'inventory':
         return <InventoryManager />;
       case 'marketplace':
-        return <BuyBackMarketplace />;
+        return <MarketplacePage />; // Updated to Global Marketplace
       case 'donations':
         return <CircularEconomy />;
       case 'circular':
