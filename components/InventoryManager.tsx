@@ -203,9 +203,9 @@ export const InventoryManager: React.FC = () => {
         // Handle Price logic for Marketplace
         if (action === SurplusAction.MARKETPLACE && resalePrice !== undefined) {
             changes.price = resalePrice; // Set new resale price
-            // Preserve original if not already set
-            if (!item.originalPrice && item.price) {
-                changes.originalPrice = item.price;
+            // Preserve original if not already set (default to 0 if missing)
+            if (!item.originalPrice) {
+                changes.originalPrice = item.price ?? 0;
             }
         }
 
@@ -216,7 +216,12 @@ export const InventoryManager: React.FC = () => {
             items: prev.items.map(i => i.id === id ? updatedItem : i)
         }));
 
-        if (updateItem) await updateItem({ id, ...changes });
+        try {
+            if (updateItem) await updateItem({ id, ...changes });
+        } catch (err: any) {
+            console.error("Error updating surplus action:", err);
+            alert(`Erreur lors de la mise à jour : ${err.message}`);
+        }
     };
 
     const handleSurplusClick = (item: any, action: SurplusAction) => {
