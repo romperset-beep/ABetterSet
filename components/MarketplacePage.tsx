@@ -11,6 +11,12 @@ interface MarketplaceItem extends ConsumableItem {
 
 export const MarketplacePage: React.FC = () => {
     const { getGlobalMarketplaceItems, user } = useProject();
+    const [items, setItems] = useState<MarketplaceItem[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState<string>('all');
+    const [isSellModalOpen, setIsSellModalOpen] = useState(false); // Added
+
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
     const [contactModalOpen, setContactModalOpen] = useState(false);
     const [activeContactItems, setActiveContactItems] = useState<MarketplaceItem[]>([]);
