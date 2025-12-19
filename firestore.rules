@@ -1,14 +1,43 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Basic Rule: Deny everything by default
+    
+    // Helper Functions
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'romperset@gmail.com';
+    }
+    function isAuth() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // 1. Users Collection
+    match /users/{userId} {
+      // Anyone authenticated can read basic profiles (needed for team lists/mentions)
+      allow read: if isAuth();
+      // Only the user themselves or Admin can edit the profile
+      allow write: if isOwner(userId) || isAdmin();
+    }
+
+    // 2. Projects & Subcollections (Items, Logs, etc.)
+    match /projects/{projectId}/{document=**} {
+      // Currently, all authenticated users can access projects.
+      // Future improvement: Check if user is member of project.
+      allow read, write: if isAuth();
+    }
+
+    // 3. Global Catalog
+    match /catalog/{itemId} {
+      allow read: if isAuth();
+      // Users can add to catalog
+      allow write: if isAuth();
+    }
+
+    // Default: Deny everything else
     match /{document=**} {
       allow read, write: if false;
-    }
-    
-    // Allow Access only if Authenticated (Anonymous or not)
-    match /{document=**} {
-      allow read, write: if request.auth != null;
     }
   }
 }

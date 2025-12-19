@@ -1,0 +1,41 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper functions
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'romperset@gmail.com';
+    }
+    function isAuth() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // 1. Sensitive User Documents (RIB, CNI, etc.)
+    // PATH: users/{userId}/documents/...
+    match /users/{userId}/documents/{allPaths=**} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    // 2. Call Sheets
+    // PATH: callsheets/...
+    match /callsheets/{allPaths=**} {
+      allow read, write: if isAuth(); // Accessible to all authenticated crew
+    }
+
+    // 3. Expenses / Receipts
+    // PATH: production/{productionName}/{userName}/expenses/...
+    // Note: This path structure is based on names, which is less secure than IDs.
+    // For now, we allow authenticated users to write, but ideally this should be refactored.
+    match /production/{allPaths=**} {
+      allow read, write: if isAuth();
+    }
+
+    // Default: Deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
