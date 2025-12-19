@@ -305,7 +305,9 @@ export const InventoryManager: React.FC = () => {
                     quantityInitial: startedQty,
                     quantityStarted: startedQty,
                     status: ItemStatus.USED,
-                    surplusAction: SurplusAction.SHORT_FILM
+                    surplusAction: action, // Changed from SHORT_FILM to action
+                    price: (action === SurplusAction.MARKETPLACE && resalePrice !== undefined) ? resalePrice : item.price,
+                    originalPrice: item.originalPrice || item.price
                 };
 
                 // New Item becomes the New portion -> Virtual Stock
@@ -334,7 +336,7 @@ export const InventoryManager: React.FC = () => {
                 }));
 
                 addNotification(
-                    `♻️ Surplus (Split) : ${item.name} -> ${newQty} Neufs vers Stock Virtuel, ${startedQty} Entamés vers Court-Métrage`,
+                    `♻️ Surplus (Split) : ${item.name} -> ${newQty} Neufs et ${startedQty} Entamés vers Stock Virtuel`,
                     'STOCK_MOVE',
                     'PRODUCTION'
                 );
