@@ -221,8 +221,8 @@ export const InventoryManager: React.FC = () => {
 
         const changes: any = { surplusAction: action };
 
-        // Handle Price logic for Marketplace
-        if (action === SurplusAction.MARKETPLACE && resalePrice !== undefined) {
+        // Handle Price logic for Marketplace, Donations, Short Films
+        if ((action === SurplusAction.MARKETPLACE || action === SurplusAction.DONATION || action === SurplusAction.SHORT_FILM) && resalePrice !== undefined) {
             changes.price = resalePrice; // Set new resale price
             // Preserve original if not already set (default to 0 if missing)
             if (!item.originalPrice) {
@@ -246,8 +246,8 @@ export const InventoryManager: React.FC = () => {
     };
 
     const handleSurplusClick = (item: any, action: SurplusAction) => {
-        // 1. Marketplace Logic: Check/Set Price
-        if (action === SurplusAction.MARKETPLACE) {
+        // 1. Marketplace/Donation/ShortFilm Logic: Check/Set Price
+        if (action === SurplusAction.MARKETPLACE || action === SurplusAction.DONATION || action === SurplusAction.SHORT_FILM) {
             // If item is being split, we handle price in confirmSurplus ('ALL' mode especially)
             // But if simply moving 'ALL' without split or moving simple item, we need price.
             // Let's first check if we need to confirm split (mixed stock)
@@ -276,7 +276,9 @@ export const InventoryManager: React.FC = () => {
     // New Helper: Prompt for Price
     const promptForMarketplacePrice = (item: any, action: SurplusAction, onConfirm?: (price: number) => void) => {
         const currentPrice = item.price || 0;
-        const suggestedPrice = currentPrice > 0 ? Math.round(currentPrice * 0.9 * 100) / 100 : 0;
+        // Default to 0 for Donations/Short Film unless user wants to set it
+        const defaultFactor = action === SurplusAction.MARKETPLACE ? 0.9 : 0;
+        const suggestedPrice = currentPrice > 0 ? Math.round(currentPrice * defaultFactor * 100) / 100 : 0;
 
         // We need a custom modal for this. Using window.prompt is ugly but functional for MVP. 
         // User requested: "ce prix sera rempli par les factures... ou s'il n'y a pas de facture il faudra definir"
@@ -304,7 +306,7 @@ export const InventoryManager: React.FC = () => {
         if (!surplusConfirmation) return;
         const { item, action } = surplusConfirmation;
 
-        if (action === SurplusAction.MARKETPLACE) {
+        if (action === SurplusAction.MARKETPLACE || action === SurplusAction.DONATION || action === SurplusAction.SHORT_FILM) {
             // Close Split Modal
             setSurplusConfirmation(null);
             // Open Price Modal
@@ -321,10 +323,12 @@ export const InventoryManager: React.FC = () => {
         const newQty = item.quantityCurrent - startedQty;
 
         if (mode === 'ALL') {
-            // If sending to Virtual Stock (Marketplace) and item has started units, split them!
-            if (action === SurplusAction.MARKETPLACE && startedQty > 0) {
+            // If sending to Surplus (Marketplace/Donation/etc) and item has started units, split them!
+            // This allows keeping the "Started" portion distinct from the "New" portion even if both go to the same destination action (or started stays behind?)
+            // Actually logic below sets surplusAction: action for Started portion too.
+            if ((action === SurplusAction.MARKETPLACE || action === SurplusAction.DONATION || action === SurplusAction.SHORT_FILM) && startedQty > 0) {
                 // 1. Prepare Objects
-                // Original becomes the Started portion -> Short Film
+                // Original becomes the Started portion
                 const updatedOriginalItem = {
                     ...item,
                     quantityCurrent: startedQty,
@@ -332,7 +336,7 @@ export const InventoryManager: React.FC = () => {
                     quantityStarted: startedQty,
                     status: ItemStatus.USED,
                     surplusAction: action,
-                    price: (action === SurplusAction.MARKETPLACE && resalePrice !== undefined) ? resalePrice : (item.price ?? 0),
+                    price: (resalePrice !== undefined) ? resalePrice : (item.price ?? 0),
                     originalPrice: item.originalPrice ?? item.price ?? 0
                 };
 
@@ -344,7 +348,7 @@ export const InventoryManager: React.FC = () => {
                     quantityInitial: newQty,
                     quantityStarted: 0,
                     status: ItemStatus.NEW,
-                    surplusAction: SurplusAction.MARKETPLACE,
+                    surplusAction: action,
                     purchased: true,
                     isBought: false,
                     price: resalePrice !== undefined ? resalePrice : (item.price ?? 0),
@@ -404,7 +408,7 @@ export const InventoryManager: React.FC = () => {
                 isBought: false
             };
 
-            if (action === SurplusAction.MARKETPLACE && resalePrice !== undefined) {
+            if ((action === SurplusAction.MARKETPLACE || action === SurplusAction.DONATION || action === SurplusAction.SHORT_FILM) && resalePrice !== undefined) {
                 newItem.price = resalePrice;
                 newItem.originalPrice = item.price;
             }
@@ -778,13 +782,21 @@ export const InventoryManager: React.FC = () => {
             {priceModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <div className="bg-cinema-800 border border-cinema-700 rounded-xl p-6 max-w-md w-full shadow-2xl">
-                        <h3 className="text-xl font-bold text-white mb-4">Prix de Revente</h3>
+                        <h3 className="text-xl font-bold text-white mb-4">
+                            {priceModal.action === SurplusAction.DONATION ? 'Valeur du Don' :
+                                priceModal.action === SurplusAction.SHORT_FILM ? 'Valeur pour Court-Métrage' :
+                                    'Prix de Revente'}
+                        </h3>
                         <p className="text-slate-300 mb-6">
-                            À quel prix souhaitez-vous proposer cet article sur le Stock Virtuel Global ?
+                            {priceModal.action === SurplusAction.DONATION ? 'Souhaitez-vous définir une valeur pour ce don ? (Facultatif)' :
+                                priceModal.action === SurplusAction.SHORT_FILM ? 'Souhaitez-vous définir un prix ou une valeur pour ce transfert ?' :
+                                    'À quel prix souhaitez-vous proposer cet article sur le Stock Virtuel Global ?'}
                         </p>
 
                         <div className="mb-6">
-                            <label className="block text-sm font-medium text-slate-400 mb-2">Prix de vente (€)</label>
+                            <label className="block text-sm font-medium text-slate-400 mb-2">
+                                {priceModal.action === SurplusAction.MARKETPLACE ? 'Prix de vente (€)' : 'Valeur / Prix (€)'}
+                            </label>
                             <input
                                 type="number"
                                 autoFocus
@@ -792,7 +804,7 @@ export const InventoryManager: React.FC = () => {
                                 id="resalePriceInput"
                                 className="w-full bg-cinema-900 border border-cinema-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-emerald-500 outline-none"
                             />
-                            {priceModal.suggestedPrice > 0 && (
+                            {priceModal.suggestedPrice > 0 && priceModal.action === SurplusAction.MARKETPLACE && (
                                 <p className="text-xs text-emerald-400 mt-2">
                                     💡 Suggéré : {priceModal.suggestedPrice}€ (Prix d'achat - 10%)
                                 </p>
@@ -814,9 +826,12 @@ export const InventoryManager: React.FC = () => {
                                         handlePriceConfirm(val);
                                     }
                                 }}
-                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold transition-colors"
+                                className={`px-4 py-2 rounded-lg font-bold transition-colors text-white ${priceModal.action === SurplusAction.DONATION ? 'bg-purple-600 hover:bg-purple-500' :
+                                    priceModal.action === SurplusAction.SHORT_FILM ? 'bg-orange-600 hover:bg-orange-500' :
+                                        'bg-emerald-600 hover:bg-emerald-500'
+                                    }`}
                             >
-                                Valider la mise en vente
+                                {priceModal.action === SurplusAction.MARKETPLACE ? 'Valider la mise en vente' : 'Valider'}
                             </button>
                         </div>
                     </div>
@@ -1099,7 +1114,7 @@ export const InventoryManager: React.FC = () => {
                                                         </div>
                                                     </div>
 
-                                                    <div className="flex items-center gap-4">
+                                                    <div className="flex flex-wrap items-center justify-end gap-3 mt-4 sm:mt-0">
                                                         {/* Start Button (Only for New items) */}
                                                         {!isSurplus && !isStarted && item.quantityCurrent > 0 && (
                                                             <button
