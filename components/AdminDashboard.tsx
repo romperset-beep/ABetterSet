@@ -3,7 +3,7 @@ import { collection, getDocs, query, doc, deleteDoc, updateDoc, increment } from
 import { db } from '../services/firebase';
 import { User } from '../types';
 import { useProject } from '../context/ProjectContext';
-import { ShieldCheck, Search, Users, Building2, Calendar, Film, Trash2, ArrowLeft, Edit2, Save, X, ShoppingCart, FileText, CheckCircle, Download } from 'lucide-react';
+import { ShieldCheck, Search, Users, Building2, Calendar, Film, Trash2, ArrowLeft, Edit2, Save, X, ShoppingCart, FileText, CheckCircle, Download, Filter } from 'lucide-react';
 import { generateInvoice } from '../utils/invoiceGenerator';
 import { Transaction } from '../types';
 import { format } from 'date-fns';
@@ -20,6 +20,7 @@ export const AdminDashboard: React.FC = () => {
     const { deleteProject, deleteUser } = useProject();
 
     const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [resalesGroupBy, setResalesGroupBy] = useState<'seller' | 'buyer' | 'date'>('seller'); // Default to seller as requested
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editForm, setEditForm] = useState<any>({});
 
@@ -75,6 +76,13 @@ export const AdminDashboard: React.FC = () => {
             projects: prodProjects
         };
     }).filter(p => !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    // Get all unique production names for search autocomplete
+    const allProductionNames = Array.from(new Set([
+        ...transactions.map(t => t.sellerName),
+        ...transactions.map(t => t.buyerName),
+        ...projectsList.map(p => p.productionCompany)
+    ])).filter(Boolean).sort();
 
     const stats = {
         totalUsers: users.length,
@@ -150,9 +158,24 @@ export const AdminDashboard: React.FC = () => {
         }
     };
 
-    const exportTransactionsCSV = () => {
+    const filteredTransactions = transactions.filter(t =>
+        t.sellerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.buyerName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const exportTransactionsCSV = (groupBy: 'seller' | 'buyer' | 'date', specificData?: Transaction[], filenameSuffix?: string) => {
         const headers = ["ID", "Date", "Vendeur", "Acheteur", "Articles", "Montant Total", "Statut"];
-        const rows = transactions.map(t => [
+
+        const dataToExport = specificData || filteredTransactions;
+
+        // Sort based on requested grouping (default date if specific data)
+        const sortedTransactions = [...dataToExport].sort((a, b) => {
+            if (groupBy === 'seller') return a.sellerName.localeCompare(b.sellerName) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+            if (groupBy === 'buyer') return a.buyerName.localeCompare(b.buyerName) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+
+        const rows = sortedTransactions.map(t => [
             t.id,
             new Date(t.createdAt).toLocaleDateString(),
             t.sellerName,
@@ -167,7 +190,7 @@ export const AdminDashboard: React.FC = () => {
 
         const link = document.createElement("a");
         link.setAttribute("href", encodeURI(csvContent));
-        link.setAttribute("download", "transactions_reventes.csv");
+        link.setAttribute("download", `transactions_${filenameSuffix || groupBy}_${format(new Date(), 'yyyy-MM-dd')}.csv`);
         document.body.appendChild(link);
         link.click();
     };
@@ -247,13 +270,20 @@ export const AdminDashboard: React.FC = () => {
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
                 <input
                     type="text"
-                    placeholder="Rechercher..."
+                    list="production-names"
+                    placeholder="Rechercher une production..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="bg-cinema-900 border border-cinema-700 text-white text-sm rounded-lg pl-10 pr-4 py-2 focus:ring-2 focus:ring-eco-500 focus:outline-none w-full md:w-64"
                 />
+                <datalist id="production-names">
+                    {allProductionNames.map(name => (
+                        <option key={name} value={name} />
+                    ))}
+                </datalist>
             </div>
         </div>
+
     );
 
     return (
@@ -538,111 +568,362 @@ export const AdminDashboard: React.FC = () => {
                 {/* RESALES VIEW */}
                 {view === 'RESALES' && (
                     <>
-                        {renderHeader('Gestion des Reventes (Inter-Prod)', `${transactions.length} transactions enregistrées`, <ShoppingCart className="h-6 w-6 text-yellow-500" />)}
+                        {renderHeader('Gestion des Reventes (Inter-Prod)', `${filteredTransactions.length} transactions affichées`, <ShoppingCart className="h-6 w-6 text-yellow-500" />)}
 
-                        <div className="p-4 bg-cinema-900/30 border-b border-cinema-700 flex justify-end">
-                            <button
-                                onClick={exportTransactionsCSV}
-                                className="flex items-center gap-2 px-4 py-2 bg-cinema-700 hover:bg-cinema-600 text-white rounded-lg text-sm font-medium transition-colors border border-cinema-600"
-                            >
-                                <Download className="h-4 w-4" />
-                                Exporter CSV
-                            </button>
+                        <div className="p-4 bg-cinema-900/30 border-b border-cinema-700 flex flex-col md:flex-row justify-between gap-4 items-center">
+                            {/* Grouping Controls */}
+                            <div className="flex gap-2">
+                                <span className="text-slate-400 text-sm flex items-center gap-2 mr-2">
+                                    <Filter className="h-4 w-4" /> Grouper par :
+                                </span>
+                                <button
+                                    onClick={() => setResalesGroupBy('seller')}
+                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${resalesGroupBy === 'seller' ? 'bg-yellow-500 text-black' : 'bg-cinema-800 text-slate-400 hover:text-white'}`}
+                                >
+                                    Vendeur
+                                </button>
+                                <button
+                                    onClick={() => setResalesGroupBy('buyer')}
+                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${resalesGroupBy === 'buyer' ? 'bg-yellow-500 text-black' : 'bg-cinema-800 text-slate-400 hover:text-white'}`}
+                                >
+                                    Acheteur
+                                </button>
+                                <button
+                                    onClick={() => setResalesGroupBy('date')}
+                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${resalesGroupBy === 'date' ? 'bg-yellow-500 text-black' : 'bg-cinema-800 text-slate-400 hover:text-white'}`}
+                                >
+                                    Date
+                                </button>
+                            </div>
+
+                            {/* Export Controls */}
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => exportTransactionsCSV('seller')}
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-cinema-700 hover:bg-cinema-600 text-white rounded-lg text-xs font-medium transition-colors border border-cinema-600"
+                                >
+                                    <Download className="h-3 w-3" />
+                                    CSV (Par Vendeur)
+                                </button>
+                                <button
+                                    onClick={() => exportTransactionsCSV('buyer')}
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-cinema-700 hover:bg-cinema-600 text-white rounded-lg text-xs font-medium transition-colors border border-cinema-600"
+                                >
+                                    <Download className="h-3 w-3" />
+                                    CSV (Par Acheteur)
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="bg-cinema-900/50 text-slate-400 text-xs uppercase tracking-wider border-b border-cinema-700">
-                                        <th className="px-6 py-4 font-semibold">Date</th>
-                                        <th className="px-6 py-4 font-semibold">Vendeur</th>
-                                        <th className="px-6 py-4 font-semibold">Acheteur</th>
-                                        <th className="px-6 py-4 font-semibold">Articles</th>
-                                        <th className="px-6 py-4 font-semibold">Montant</th>
-                                        <th className="px-6 py-4 font-semibold">Statut</th>
-                                        <th className="px-6 py-4 font-semibold text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-cinema-700 text-sm">
-                                    {transactions
-                                        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                                        .map((t) => (
-                                            <tr key={t.id} className="hover:bg-cinema-700/30 transition-colors">
-                                                <td className="px-6 py-4 text-slate-300">
-                                                    {new Date(t.createdAt).toLocaleDateString()}
-                                                    <div className="text-xs text-slate-500">{new Date(t.createdAt).toLocaleTimeString()}</div>
-                                                </td>
-                                                <td className="px-6 py-4 text-white font-medium">
-                                                    {t.sellerName}
-                                                </td>
-                                                <td className="px-6 py-4 text-white font-medium">
-                                                    {t.buyerName}
-                                                </td>
-                                                <td className="px-6 py-4 text-slate-300 text-xs">
-                                                    <ul className="list-disc list-inside">
-                                                        {t.items.slice(0, 2).map((i, idx) => (
-                                                            <li key={idx}>{i.quantity}x {i.name} ({i.price}€)</li>
-                                                        ))}
-                                                        {t.items.length > 2 && <li>... (+{t.items.length - 2})</li>}
-                                                    </ul>
-                                                </td>
-                                                <td className="px-6 py-4 text-yellow-400 font-bold font-mono">
-                                                    {t.totalAmount.toFixed(2)} €
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    {t.status === 'PENDING' ? (
-                                                        <span className="px-2 py-1 rounded-full text-xs font-bold bg-yellow-500/20 text-yellow-500 border border-yellow-500/30 animate-pulse">
-                                                            En attente
-                                                        </span>
-                                                    ) : t.status === 'CANCELLED' ? (
-                                                        <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-500 border border-red-500/30 flex items-center w-fit gap-1">
-                                                            <X className="h-3 w-3" /> Refusé
-                                                        </span>
-                                                    ) : (
-                                                        <span className="px-2 py-1 rounded-full text-xs font-bold bg-green-500/20 text-green-500 border border-green-500/30 flex items-center w-fit gap-1">
-                                                            <CheckCircle className="h-3 w-3" /> Validé
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    <div className="flex justify-end gap-2">
-                                                        {t.status === 'PENDING' && (
-                                                            <>
-                                                                <button
-                                                                    onClick={() => handleValidateTransaction(t)}
-                                                                    className="flex items-center gap-1 bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors shadow-lg shadow-green-600/20"
-                                                                    title="Valider la vente"
-                                                                >
-                                                                    <CheckCircle className="h-3 w-3" /> Valider
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleRejectTransaction(t)}
-                                                                    className="flex items-center gap-1 bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-600/30 px-3 py-1.5 rounded text-xs font-bold transition-colors"
-                                                                    title="Refuser et Restocker"
-                                                                >
-                                                                    <X className="h-3 w-3" /> Refuser
-                                                                </button>
-                                                            </>
-                                                        )}
-                                                        {t.status === 'VALIDATED' && (
-                                                            <button
-                                                                onClick={() => generateInvoice(t)}
-                                                                className="flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors shadow-lg shadow-blue-600/20"
-                                                                title="Télécharger Facture PDF"
-                                                            >
-                                                                <FileText className="h-3 w-3" /> Facture
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                </tbody>
-                            </table>
-                        </div>
+                        {searchTerm ? (
+                            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                {/* VENTES (Sales) - When searched entity is SELLER */}
+                                <div className="bg-cinema-800/50 rounded-xl overflow-hidden border border-cinema-700">
+                                    <div className="bg-emerald-900/30 px-6 py-4 border-b border-emerald-500/20 flex justify-between items-center">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-emerald-500/10 rounded-lg">
+                                                <Building2 className="h-5 w-5 text-emerald-400" />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-white text-lg">Ses Ventes / Recettes</h3>
+                                                <p className="text-sm text-emerald-400/70">Transactions où "{searchTerm}" est vendeur</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => exportTransactionsCSV('date', filteredTransactions.filter(t => t.sellerName.toLowerCase().includes(searchTerm.toLowerCase())), `ventes_${searchTerm}`)}
+                                            className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-medium transition-colors"
+                                        >
+                                            <Download className="h-3 w-3" />
+                                            Export Ventes
+                                        </button>
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr className="bg-cinema-900/50 text-emerald-400/70 text-xs uppercase tracking-wider border-b border-cinema-700">
+                                                    <th className="px-6 py-4 font-semibold w-32">Date</th>
+                                                    <th className="px-6 py-4 font-semibold">Acheteur</th>
+                                                    <th className="px-6 py-4 font-semibold">Articles</th>
+                                                    <th className="px-6 py-4 font-semibold">Montant</th>
+                                                    <th className="px-6 py-4 font-semibold">Statut</th>
+                                                    <th className="px-6 py-4 font-semibold text-right">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-cinema-700 text-sm">
+                                                {filteredTransactions
+                                                    .filter(t => t.sellerName.toLowerCase().includes(searchTerm.toLowerCase()))
+                                                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                                                    .map((t) => (
+                                                        <tr key={t.id} className="hover:bg-cinema-700/30 transition-colors">
+                                                            <td className="px-6 py-4 text-slate-300">
+                                                                {new Date(t.createdAt).toLocaleDateString()}
+                                                                <div className="text-xs text-slate-500">{new Date(t.createdAt).toLocaleTimeString()}</div>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-white font-medium">{t.buyerName}</td>
+                                                            <td className="px-6 py-4 text-slate-300 text-xs">
+                                                                <ul className="list-disc list-inside">
+                                                                    {t.items.slice(0, 2).map((i, idx) => (
+                                                                        <li key={idx}>{i.quantity}x {i.name} ({i.price}€)</li>
+                                                                    ))}
+                                                                    {t.items.length > 2 && <li>... (+{t.items.length - 2})</li>}
+                                                                </ul>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-yellow-400 font-bold font-mono">{t.totalAmount.toFixed(2)} €</td>
+                                                            <td className="px-6 py-4">
+                                                                {t.status === 'PENDING' ? (
+                                                                    <span className="px-2 py-1 rounded-full text-xs font-bold bg-yellow-500/20 text-yellow-500 border border-yellow-500/30 animate-pulse">En attente</span>
+                                                                ) : t.status === 'CANCELLED' ? (
+                                                                    <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-500 border border-red-500/30 flex items-center w-fit gap-1"><X className="h-3 w-3" /> Refusé</span>
+                                                                ) : (
+                                                                    <span className="px-2 py-1 rounded-full text-xs font-bold bg-green-500/20 text-green-500 border border-green-500/30 flex items-center w-fit gap-1"><CheckCircle className="h-3 w-3" /> Validé</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-6 py-4 text-right">
+                                                                {/* ACTIONS SAME AS BEFORE */}
+                                                                <div className="flex justify-end gap-2">
+                                                                    {t.status === 'PENDING' && (
+                                                                        <>
+                                                                            <button onClick={() => handleValidateTransaction(t)} className="flex items-center gap-1 bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors shadow-lg shadow-green-600/20"><CheckCircle className="h-3 w-3" /> Valider</button>
+                                                                            <button onClick={() => handleRejectTransaction(t)} className="flex items-center gap-1 bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-600/30 px-3 py-1.5 rounded text-xs font-bold transition-colors"><X className="h-3 w-3" /> Refuser</button>
+                                                                        </>
+                                                                    )}
+                                                                    {t.status === 'VALIDATED' && (
+                                                                        <button onClick={() => generateInvoice(t)} className="flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors shadow-lg shadow-blue-600/20"><FileText className="h-3 w-3" /> Facture</button>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                {filteredTransactions.filter(t => t.sellerName.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
+                                                    <tr>
+                                                        <td colSpan={6} className="px-6 py-8 text-center text-slate-500 italic">Aucune vente trouvée pour cette recherche.</td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                {/* ACHATS (Purchases) - When searched entity is BUYER */}
+                                <div className="bg-cinema-800/50 rounded-xl overflow-hidden border border-cinema-700">
+                                    <div className="bg-blue-900/30 px-6 py-4 border-b border-blue-500/20 flex justify-between items-center">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-blue-500/10 rounded-lg">
+                                                <ShoppingCart className="h-5 w-5 text-blue-400" />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-white text-lg">Ses Achats / Dépenses</h3>
+                                                <p className="text-sm text-blue-400/70">Transactions où "{searchTerm}" est acheteur</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => exportTransactionsCSV('date', filteredTransactions.filter(t => t.buyerName.toLowerCase().includes(searchTerm.toLowerCase())), `achats_${searchTerm}`)}
+                                            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded-lg text-xs font-medium transition-colors"
+                                        >
+                                            <Download className="h-3 w-3" />
+                                            Export Achats
+                                        </button>
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr className="bg-cinema-900/50 text-blue-400/70 text-xs uppercase tracking-wider border-b border-cinema-700">
+                                                    <th className="px-6 py-4 font-semibold w-32">Date</th>
+                                                    <th className="px-6 py-4 font-semibold">Vendeur</th>
+                                                    <th className="px-6 py-4 font-semibold">Articles</th>
+                                                    <th className="px-6 py-4 font-semibold">Montant</th>
+                                                    <th className="px-6 py-4 font-semibold">Statut</th>
+                                                    <th className="px-6 py-4 font-semibold text-right">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-cinema-700 text-sm">
+                                                {filteredTransactions
+                                                    .filter(t => t.buyerName.toLowerCase().includes(searchTerm.toLowerCase()))
+                                                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                                                    .map((t) => (
+                                                        <tr key={t.id} className="hover:bg-cinema-700/30 transition-colors">
+                                                            <td className="px-6 py-4 text-slate-300">
+                                                                {new Date(t.createdAt).toLocaleDateString()}
+                                                                <div className="text-xs text-slate-500">{new Date(t.createdAt).toLocaleTimeString()}</div>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-white font-medium">{t.sellerName}</td>
+                                                            <td className="px-6 py-4 text-slate-300 text-xs">
+                                                                <ul className="list-disc list-inside">
+                                                                    {t.items.slice(0, 2).map((i, idx) => (
+                                                                        <li key={idx}>{i.quantity}x {i.name} ({i.price}€)</li>
+                                                                    ))}
+                                                                    {t.items.length > 2 && <li>... (+{t.items.length - 2})</li>}
+                                                                </ul>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-yellow-400 font-bold font-mono">{t.totalAmount.toFixed(2)} €</td>
+                                                            <td className="px-6 py-4">
+                                                                {t.status === 'PENDING' ? (
+                                                                    <span className="px-2 py-1 rounded-full text-xs font-bold bg-yellow-500/20 text-yellow-500 border border-yellow-500/30 animate-pulse">En attente</span>
+                                                                ) : t.status === 'CANCELLED' ? (
+                                                                    <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-500 border border-red-500/30 flex items-center w-fit gap-1"><X className="h-3 w-3" /> Refusé</span>
+                                                                ) : (
+                                                                    <span className="px-2 py-1 rounded-full text-xs font-bold bg-green-500/20 text-green-500 border border-green-500/30 flex items-center w-fit gap-1"><CheckCircle className="h-3 w-3" /> Validé</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-6 py-4 text-right">
+                                                                <div className="flex justify-end gap-2">
+                                                                    {t.status === 'PENDING' && (
+                                                                        <>
+                                                                            <button onClick={() => handleValidateTransaction(t)} className="flex items-center gap-1 bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors shadow-lg shadow-green-600/20"><CheckCircle className="h-3 w-3" /> Valider</button>
+                                                                            <button onClick={() => handleRejectTransaction(t)} className="flex items-center gap-1 bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-600/30 px-3 py-1.5 rounded text-xs font-bold transition-colors"><X className="h-3 w-3" /> Refuser</button>
+                                                                        </>
+                                                                    )}
+                                                                    {t.status === 'VALIDATED' && (
+                                                                        <button onClick={() => generateInvoice(t)} className="flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors shadow-lg shadow-blue-600/20"><FileText className="h-3 w-3" /> Facture</button>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                {filteredTransactions.filter(t => t.buyerName.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
+                                                    <tr>
+                                                        <td colSpan={6} className="px-6 py-8 text-center text-slate-500 italic">Aucun achat trouvé pour cette recherche.</td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="p-4 space-y-8">
+                                {(() => {
+                                    let groups: Record<string, Transaction[]> = {};
+
+                                    if (resalesGroupBy === 'date') {
+                                        // Single group "Tout" (but filtered)
+                                        groups['Toutes les transactions'] = filteredTransactions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                                    } else {
+                                        // Group by Seller or Buyer (filtered)
+                                        groups = filteredTransactions.reduce((acc, t) => {
+                                            const key = resalesGroupBy === 'seller' ? t.sellerName : t.buyerName;
+                                            if (!acc[key]) acc[key] = [];
+                                            acc[key].push(t);
+                                            return acc;
+                                        }, {} as Record<string, Transaction[]>);
+                                    }
+
+                                    const sortedGroupKeys = Object.keys(groups).sort();
+
+                                    return sortedGroupKeys.map(groupKey => (
+                                        <div key={groupKey} className="bg-cinema-800/50 rounded-xl overflow-hidden border border-cinema-700">
+                                            <div className="bg-cinema-700/50 px-6 py-3 border-b border-cinema-600 flex justify-between items-center">
+                                                <h3 className="font-bold text-white flex items-center gap-2">
+                                                    {resalesGroupBy === 'seller' ? <Building2 className="h-4 w-4 text-blue-400" /> :
+                                                        resalesGroupBy === 'buyer' ? <ShoppingCart className="h-4 w-4 text-green-400" /> :
+                                                            <Calendar className="h-4 w-4 text-slate-400" />}
+                                                    {groupKey}
+                                                </h3>
+                                                <span className="text-xs bg-cinema-900 text-slate-400 px-2 py-0.5 rounded-full">
+                                                    {groups[groupKey].length} transactions
+                                                </span>
+                                            </div>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-left border-collapse">
+                                                    <thead>
+                                                        <tr className="bg-cinema-900/50 text-slate-400 text-xs uppercase tracking-wider border-b border-cinema-700">
+                                                            <th className="px-6 py-4 font-semibold w-32">Date</th>
+                                                            {resalesGroupBy !== 'seller' && <th className="px-6 py-4 font-semibold">Vendeur</th>}
+                                                            {resalesGroupBy !== 'buyer' && <th className="px-6 py-4 font-semibold">Acheteur</th>}
+                                                            <th className="px-6 py-4 font-semibold">Articles</th>
+                                                            <th className="px-6 py-4 font-semibold">Montant</th>
+                                                            <th className="px-6 py-4 font-semibold">Statut</th>
+                                                            <th className="px-6 py-4 font-semibold text-right">Actions</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-cinema-700 text-sm">
+                                                        {groups[groupKey]
+                                                            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                                                            .map((t) => (
+                                                                <tr key={t.id} className="hover:bg-cinema-700/30 transition-colors">
+                                                                    <td className="px-6 py-4 text-slate-300">
+                                                                        {new Date(t.createdAt).toLocaleDateString()}
+                                                                        <div className="text-xs text-slate-500">{new Date(t.createdAt).toLocaleTimeString()}</div>
+                                                                    </td>
+                                                                    {resalesGroupBy !== 'seller' && (
+                                                                        <td className="px-6 py-4 text-white font-medium">
+                                                                            {t.sellerName}
+                                                                        </td>
+                                                                    )}
+                                                                    {resalesGroupBy !== 'buyer' && (
+                                                                        <td className="px-6 py-4 text-white font-medium">
+                                                                            {t.buyerName}
+                                                                        </td>
+                                                                    )}
+                                                                    <td className="px-6 py-4 text-slate-300 text-xs">
+                                                                        <ul className="list-disc list-inside">
+                                                                            {t.items.slice(0, 2).map((i, idx) => (
+                                                                                <li key={idx}>{i.quantity}x {i.name} ({i.price}€)</li>
+                                                                            ))}
+                                                                            {t.items.length > 2 && <li>... (+{t.items.length - 2})</li>}
+                                                                        </ul>
+                                                                    </td>
+                                                                    <td className="px-6 py-4 text-yellow-400 font-bold font-mono">
+                                                                        {t.totalAmount.toFixed(2)} €
+                                                                    </td>
+                                                                    <td className="px-6 py-4">
+                                                                        {t.status === 'PENDING' ? (
+                                                                            <span className="px-2 py-1 rounded-full text-xs font-bold bg-yellow-500/20 text-yellow-500 border border-yellow-500/30 animate-pulse">
+                                                                                En attente
+                                                                            </span>
+                                                                        ) : t.status === 'CANCELLED' ? (
+                                                                            <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-500 border border-red-500/30 flex items-center w-fit gap-1">
+                                                                                <X className="h-3 w-3" /> Refusé
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className="px-2 py-1 rounded-full text-xs font-bold bg-green-500/20 text-green-500 border border-green-500/30 flex items-center w-fit gap-1">
+                                                                                <CheckCircle className="h-3 w-3" /> Validé
+                                                                            </span>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="px-6 py-4 text-right">
+                                                                        <div className="flex justify-end gap-2">
+                                                                            {t.status === 'PENDING' && (
+                                                                                <>
+                                                                                    <button
+                                                                                        onClick={() => handleValidateTransaction(t)}
+                                                                                        className="flex items-center gap-1 bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors shadow-lg shadow-green-600/20"
+                                                                                        title="Valider la vente"
+                                                                                    >
+                                                                                        <CheckCircle className="h-3 w-3" /> Valider
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => handleRejectTransaction(t)}
+                                                                                        className="flex items-center gap-1 bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-600/30 px-3 py-1.5 rounded text-xs font-bold transition-colors"
+                                                                                        title="Refuser et Restocker"
+                                                                                    >
+                                                                                        <X className="h-3 w-3" /> Refuser
+                                                                                    </button>
+                                                                                </>
+                                                                            )}
+                                                                            {t.status === 'VALIDATED' && (
+                                                                                <button
+                                                                                    onClick={() => generateInvoice(t)}
+                                                                                    className="flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors shadow-lg shadow-blue-600/20"
+                                                                                    title="Télécharger Facture PDF"
+                                                                                >
+                                                                                    <FileText className="h-3 w-3" /> Facture
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    ));
+                                })()}
+                            </div>
+                        )}
                     </>
                 )}
-
             </div>
         </div>
     );
