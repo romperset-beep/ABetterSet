@@ -813,15 +813,25 @@ export const AdminDashboard: React.FC = () => {
                                     return sortedGroupKeys.map(groupKey => (
                                         <div key={groupKey} className="bg-cinema-800/50 rounded-xl overflow-hidden border border-cinema-700">
                                             <div className="bg-cinema-700/50 px-6 py-3 border-b border-cinema-600 flex justify-between items-center">
-                                                <h3 className="font-bold text-white flex items-center gap-2">
-                                                    {resalesGroupBy === 'seller' ? <Building2 className="h-4 w-4 text-blue-400" /> :
-                                                        resalesGroupBy === 'buyer' ? <ShoppingCart className="h-4 w-4 text-green-400" /> :
-                                                            <Calendar className="h-4 w-4 text-slate-400" />}
-                                                    {groupKey}
-                                                </h3>
-                                                <span className="text-xs bg-cinema-900 text-slate-400 px-2 py-0.5 rounded-full">
-                                                    {groups[groupKey].length} transactions
-                                                </span>
+                                                <div className="flex items-center gap-4">
+                                                    <h3 className="font-bold text-white flex items-center gap-2">
+                                                        {resalesGroupBy === 'seller' ? <Building2 className="h-4 w-4 text-blue-400" /> :
+                                                            resalesGroupBy === 'buyer' ? <ShoppingCart className="h-4 w-4 text-green-400" /> :
+                                                                <Calendar className="h-4 w-4 text-slate-400" />}
+                                                        {groupKey}
+                                                    </h3>
+                                                    <span className="text-xs bg-cinema-900 text-slate-400 px-2 py-0.5 rounded-full">
+                                                        {groups[groupKey].length} transactions
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    onClick={() => exportTransactionsCSV(resalesGroupBy, groups[groupKey], `export_${groupKey.replace(/[^a-z0-9]/gi, '_').toLowerCase()}`)}
+                                                    className="flex items-center gap-2 px-3 py-1.5 bg-cinema-600 hover:bg-cinema-500 text-slate-200 rounded text-xs font-medium transition-colors border border-cinema-500 shadow-sm"
+                                                    title={`Exporter les transactions de ${groupKey}`}
+                                                >
+                                                    <Download className="h-3 w-3" />
+                                                    CSV
+                                                </button>
                                             </div>
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-left border-collapse">
