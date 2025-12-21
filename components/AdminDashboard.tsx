@@ -3,13 +3,13 @@ import { collection, getDocs, query, doc, deleteDoc, updateDoc, increment } from
 import { db } from '../services/firebase';
 import { User } from '../types';
 import { useProject } from '../context/ProjectContext';
-import { ShieldCheck, Search, Users, Building2, Calendar, Film, Trash2, ArrowLeft, Edit2, Save, X, ShoppingCart, FileText, CheckCircle, Download, Filter } from 'lucide-react';
+import { ShieldCheck, Search, Users, Building2, Calendar, Film, Trash2, ArrowLeft, Edit2, Save, X, ShoppingCart, FileText, CheckCircle, Download, Filter, AlertTriangle } from 'lucide-react';
 import { generateInvoice } from '../utils/invoiceGenerator';
 import { Transaction } from '../types';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
-type ViewMode = 'DASHBOARD' | 'USERS' | 'PRODUCTIONS' | 'PROJECTS' | 'RESALES';
+type ViewMode = 'DASHBOARD' | 'USERS' | 'PRODUCTIONS' | 'PROJECTS' | 'RESALES' | 'RESET';
 
 export const AdminDashboard: React.FC = () => {
     const [view, setView] = useState<ViewMode>('DASHBOARD');
@@ -17,12 +17,13 @@ export const AdminDashboard: React.FC = () => {
     const [projectsList, setProjectsList] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const { deleteProject, deleteUser } = useProject();
+    const { deleteProject, deleteUser, deleteAllData } = useProject();
 
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [resalesGroupBy, setResalesGroupBy] = useState<'seller' | 'buyer' | 'date'>('seller'); // Default to seller as requested
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editForm, setEditForm] = useState<any>({});
+    const [resetConfirm, setResetConfirm] = useState("");
 
     const fetchData = async () => {
         setIsLoading(true);
@@ -336,6 +337,18 @@ export const AdminDashboard: React.FC = () => {
                     <h3 className="text-slate-400 text-sm font-medium uppercase tracking-wider mb-2">Reventes & Facturation</h3>
                     <p className="text-4xl font-bold text-white mb-1">{transactions.length}</p>
                     <p className="text-xs text-yellow-500 font-medium">Gérer les transactions</p>
+                </div>
+
+                <div
+                    onClick={() => setView('RESET')}
+                    className={`bg-cinema-800 p-6 rounded-xl border ${view === 'RESET' ? 'border-red-600 ring-2 ring-red-600/20' : 'border-cinema-700 bg-red-950/10'} shadow-lg relative overflow-hidden group hover:border-red-600/50 transition-all cursor-pointer`}
+                >
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <AlertTriangle className="h-24 w-24 text-red-600" />
+                    </div>
+                    <h3 className="text-red-400 text-sm font-medium uppercase tracking-wider mb-2">Zone de Danger</h3>
+                    <p className="text-4xl font-bold text-white mb-1">RESET</p>
+                    <p className="text-xs text-red-500 font-medium">Réinitialisation complète</p>
                 </div>
             </div>
 
@@ -933,6 +946,66 @@ export const AdminDashboard: React.FC = () => {
                             </div>
                         )}
                     </>
+                )}
+                {/* DANGER ZONE VIEW */}
+                {view === 'RESET' && (
+                    <div className="p-8 max-w-2xl mx-auto">
+                        <div className="border border-red-600/30 bg-red-950/20 rounded-xl p-8 text-center space-y-6">
+                            <div className="mx-auto w-20 h-20 bg-red-900/30 rounded-full flex items-center justify-center mb-4 ring-2 ring-red-600/50 animate-pulse">
+                                <AlertTriangle className="h-10 w-10 text-red-500" />
+                            </div>
+
+                            <h2 className="text-2xl font-bold text-white">Réinitialisation Globale</h2>
+
+                            <div className="text-red-200 bg-red-950/40 p-4 rounded-lg text-sm text-left">
+                                <p className="font-bold mb-2 uppercase flex items-center gap-2">
+                                    <AlertTriangle className="h-4 w-4" /> Attention : Action Irréversible
+                                </p>
+                                <ul className="list-disc list-inside space-y-1 opacity-90">
+                                    <li>Toutes les productions et projets seront supprimés.</li>
+                                    <li>Toutes les transactions et reventes seront effacées.</li>
+                                    <li>L'historique des projets de tous les utilisateurs sera vidé.</li>
+                                    <li><strong className="text-white">Les comptes utilisateurs (Authentification) et leurs profils seront CONSERVÉS.</strong></li>
+                                </ul>
+                            </div>
+
+                            <div className="space-y-4 pt-4">
+                                <p className="text-slate-400 text-sm">
+                                    Pour confirmer, veuillez taper <span className="font-mono bg-black px-2 py-0.5 rounded text-white select-all">SUPPRIMER-TOUT</span> ci-dessous :
+                                </p>
+                                <input
+                                    type="text"
+                                    className="w-full bg-black border border-red-900 rounded-lg px-4 py-3 text-center text-white font-mono focus:ring-2 focus:ring-red-500 focus:outline-none"
+                                    placeholder="SUPPRIMER-TOUT"
+                                    value={resetConfirm}
+                                    onChange={(e) => setResetConfirm(e.target.value)}
+                                />
+                            </div>
+
+                            <button
+                                disabled={resetConfirm !== 'SUPPRIMER-TOUT'}
+                                onClick={async () => {
+                                    if (window.confirm("DERNIÈRE CHANCE : Êtes-vous ABSOLUMENT SÛR ?")) {
+                                        try {
+                                            await deleteAllData();
+                                            setResetConfirm("");
+                                            setView('DASHBOARD');
+                                            fetchData(); // Refresh local list
+                                        } catch (e: any) {
+                                            alert(e.message);
+                                        }
+                                    }
+                                }}
+                                className={`w-full py-4 rounded-lg font-bold text-lg transition-all ${resetConfirm === 'SUPPRIMER-TOUT'
+                                    ? 'bg-red-600 hover:bg-red-500 text-white shadow-[0_0_20px_rgba(220,38,38,0.5)] scale-105'
+                                    : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                    }`}
+                            >
+                                <Trash2 className="inline-block mr-2 h-5 w-5" />
+                                CONFIRMER LA RÉINITIALISATION
+                            </button>
+                        </div>
+                    </div>
                 )}
             </div>
         </div>

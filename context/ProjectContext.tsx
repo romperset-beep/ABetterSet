@@ -136,6 +136,7 @@ interface ProjectContextType {
 
   // User Management
   deleteUser: (userId: string) => Promise<void>; // Added
+  deleteAllData: () => Promise<void>; // New Global Reset
 
   // Social Nav Control
   socialAudience: 'GLOBAL' | 'DEPARTMENT' | 'USER';
@@ -1150,6 +1151,71 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
+  const deleteAllData = async () => {
+    if (!auth.currentUser || !user) return;
+    if (user.email !== 'romperset@gmail.com') {
+      throw new Error("Action réservée à l'administrateur suprême.");
+    }
+
+    try {
+      console.log("⚠️ STARTING GLOBAL RESET ⚠️");
+      addNotification("Réinitialisation globale en cours...", "WARNING", "PRODUCTION");
+
+      // 1. DELETE ALL PROJECTS
+      const projectsSnap = await getDocs(collection(db, 'projects'));
+      console.log(`Found ${projectsSnap.size} projects to delete.`);
+
+      for (const pDoc of projectsSnap.docs) {
+        await deleteProject(pDoc.id); // Re-use existing robust logic
+      }
+
+      // 2. DELETE ALL TRANSACTIONS
+      const transactionsSnap = await getDocs(collection(db, 'transactions'));
+      console.log(`Found ${transactionsSnap.size} transactions to delete.`);
+      const transactionPromises = transactionsSnap.docs.map(tDoc => deleteDoc(tDoc.ref));
+      await Promise.all(transactionPromises);
+
+      // 3. CLEAN ALL USERS (Project History & Current Project)
+      // We process ALL users to remove ghosts
+      const usersSnap = await getDocs(collection(db, 'users'));
+      console.log(`Cleaning profiles for ${usersSnap.size} users.`);
+
+      const userUpdates = usersSnap.docs.map(async (uDoc) => {
+        // Reset project fields but KEEP profile data (name, email, role, etc.)
+        await updateDoc(uDoc.ref, {
+          productionName: '',
+          filmTitle: '',
+          startDate: null,
+          endDate: null,
+          projectType: null,
+          currentProjectId: null,
+          projectHistory: [] // Clear history
+        });
+      });
+      await Promise.all(userUpdates);
+
+      // 4. Force Local State Reset
+      setProject(DEFAULT_PROJECT);
+      setUser(prev => prev ? ({
+        ...prev,
+        productionName: '',
+        filmTitle: '',
+        startDate: undefined,
+        endDate: undefined,
+        currentProjectId: undefined,
+        projectHistory: []
+      }) : null);
+
+      addNotification("Système remis à zéro avec succès.", "SUCCESS", "PRODUCTION");
+      console.log("✅ GLOBAL RESET COMPLETED");
+
+    } catch (err: any) {
+      console.error("FATAL ERROR during Global Reset:", err);
+      setError(`ECHEC RESET: ${err.message}`);
+      throw err;
+    }
+  };
+
 
 
   const logout = async () => {
@@ -1763,6 +1829,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       deleteLogisticsRequest,
       searchProjects, // Added
       deleteUser, // Added
+      deleteAllData, // Added Global Reset
 
       userProfiles,
       updateUserProfile,
