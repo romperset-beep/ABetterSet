@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useProject } from '../context/ProjectContext';
 import { UserProfile, Department } from '../types';
 import { Save, Upload, FileText, CheckCircle, Trash2 } from 'lucide-react';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, auth, storage } from '../services/firebase';
 import { USPA_JOBS } from '../data/uspaRates';
@@ -11,25 +11,112 @@ export const UserProfilePage: React.FC = () => {
     const { user, userProfiles, updateUserProfile } = useProject();
     const [formData, setFormData] = useState<Partial<UserProfile>>({});
     const [isEditing, setIsEditing] = useState(true);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        if (user) {
+        const loadUserData = async () => {
+            if (!user) return;
+
+            // 1. Try to get from Context (userProfiles) - Best for team view consistency
             const existingProfile = userProfiles.find(p => p.email === user.email);
+
+            // 2. Direct Fetch from Firestore (Source of Truth) to ensure we have personal data
+            // (Context 'userProfiles' might be filtered or incomplete)
+            try {
+                if (auth.currentUser) {
+                    const userRef = doc(db, 'users', auth.currentUser.uid);
+                    const snap = await getDoc(userRef);
+                    if (snap.exists()) {
+                        const data = snap.data() as UserProfile; // Cast to ensure we get fields
+                        console.log("Direct Profile Fetch Success:", data);
+
+                        // Merge logic: Priority to Direct Fetch
+                        const mergedData = {
+                            ...existingProfile, // Project context info
+                            ...data,            // Personal private info
+                            id: user.email // Ensure ID is consistent for updates
+                        };
+
+                        setFormData({
+                            email: user.email,
+                            firstName: mergedData.firstName || user.name.split(' ')[0],
+                            lastName: mergedData.lastName || user.name.split(' ').slice(1).join(' '),
+                            department: user.department,
+                            role: mergedData.role || (user.department === 'PRODUCTION' ? 'Production' : 'Technicien'),
+                            nationality: mergedData.nationality || 'Française',
+                            birthCountry: mergedData.birthCountry || 'France',
+
+                            // Explicit mapping to ensure no field is missed
+                            address: mergedData.address || '',
+                            postalCode: mergedData.postalCode || '',
+                            city: mergedData.city || '',
+                            phone: mergedData.phone || '',
+                            familyStatus: mergedData.familyStatus || '',
+                            ssn: mergedData.ssn || '',
+                            birthPlace: mergedData.birthPlace || '',
+                            birthDate: mergedData.birthDate || '',
+                            birthDepartment: mergedData.birthDepartment || '',
+                            socialSecurityCenterAddress: mergedData.socialSecurityCenterAddress || '',
+                            emergencyContactName: mergedData.emergencyContactName || '',
+                            emergencyContactPhone: mergedData.emergencyContactPhone || '',
+                            congeSpectacleNumber: mergedData.congeSpectacleNumber || '',
+                            lastMedicalVisit: mergedData.lastMedicalVisit || '',
+                            isRetired: mergedData.isRetired || false,
+                            rib: mergedData.rib,
+                            cmbCard: mergedData.cmbCard,
+                            idCard: mergedData.idCard,
+                            drivingLicense: mergedData.drivingLicense,
+                            dietaryHabits: mergedData.dietaryHabits
+                        });
+                        setIsEditing(false); // Assume if data exists, we view it first
+                        setIsLoading(false);
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.error("Direct fetch failed", err);
+            }
+
+            // 3. Fallback to Context User Object if direct fetch fails
             if (existingProfile) {
                 setFormData(existingProfile);
                 setIsEditing(false);
             } else {
+                // ... (Previous fallback logic kept as safety net)
+                const u = user as any;
                 setFormData({
                     email: user.email,
-                    firstName: user.name.split(' ')[0],
-                    lastName: user.name.split(' ').slice(1).join(' '),
+                    firstName: u.firstName || user.name.split(' ')[0],
+                    lastName: u.lastName || user.name.split(' ').slice(1).join(' '),
                     department: user.department,
-                    role: user.department === 'PRODUCTION' ? 'Production' : 'Technicien',
-                    nationality: 'Française',
-                    birthCountry: 'France'
+                    role: u.role || (user.department === 'PRODUCTION' ? 'Production' : 'Technicien'),
+                    nationality: u.nationality || 'Française',
+                    birthCountry: u.birthCountry || 'France',
+                    address: u.address || '',
+                    postalCode: u.postalCode || '',
+                    city: u.city || '',
+                    phone: u.phone || '',
+                    familyStatus: u.familyStatus || '',
+                    ssn: u.ssn || '',
+                    birthPlace: u.birthPlace || '',
+                    birthDate: u.birthDate || '',
+                    birthDepartment: u.birthDepartment || '',
+                    socialSecurityCenterAddress: u.socialSecurityCenterAddress || '',
+                    emergencyContactName: u.emergencyContactName || '',
+                    emergencyContactPhone: u.emergencyContactPhone || '',
+                    congeSpectacleNumber: u.congeSpectacleNumber || '',
+                    lastMedicalVisit: u.lastMedicalVisit || '',
+                    isRetired: u.isRetired || false,
+                    rib: u.rib,
+                    cmbCard: u.cmbCard,
+                    idCard: u.idCard,
+                    drivingLicense: u.drivingLicense
                 });
             }
-        }
+            setIsLoading(false);
+        };
+
+        loadUserData();
     }, [user, userProfiles]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -163,6 +250,7 @@ ${formData.firstName} ${formData.lastName}`;
     };
 
     if (!user) return <div>Veuillez vous connecter.</div>;
+    if (isLoading) return <div className="flex justify-center items-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-eco-500"></div></div>;
 
     return (
         <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500 pb-12">
