@@ -75,33 +75,27 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, onCl
   ];
 
   const filterItem = (item: any) => {
-    // 1. Admin restricted
+    // 1. Admin restricted (Top priority)
     if (item.id === 'admin') return user?.email === 'romperset@gmail.com';
 
-    // 2. Universal items (Visible to ALL)
-    if (item.id === 'dashboard') return true;
-    if (item.id === 'profile') return true;
-    if (item.id === 'callsheets') return true;
-    if (item.id === 'timesheet') return true;
-    if (item.id === 'renforts') return true;
-    if (item.id === 'logistics') return true;
-    if (item.id === 'team') return true;
-    if (item.id === 'inventory') return true;
-    if (item.id === 'social') return true;
-    if (item.id === 'expenses') return true;
-    if (item.id === 'local_marketplace') return true;
-    if (item.id === 'donations') return true;
+    // 2. Production sees everything else
+    if (currentDept === 'PRODUCTION') return true;
 
-    // 3. Role-based restrictions
-    // Production/Regie Scope
-    const isProdOrRegie = currentDept === 'PRODUCTION' || currentDept === 'Régie' || currentDept === 'REGIE';
+    // 3. Define Restricted Items Groups
+    const prodOnlyItems = ['inter_marketplace', 'donations', 'report'];
+    const prodAndRegieItems = ['catering'];
 
-    if (item.id === 'inter_marketplace') return isProdOrRegie;
-    if (item.id === 'catering') return isProdOrRegie;
-    if (item.id === 'report') return isProdOrRegie;
+    // 4. Check Restrictions
+    if (prodOnlyItems.includes(item.id)) return false; // Production caught above, so everyone else returns false here
 
-    // Default fallback
-    return false;
+    if (prodAndRegieItems.includes(item.id)) {
+      // Production caught above
+      return currentDept === 'REGIE' || currentDept === 'Régie';
+    }
+
+    // 5. All other items are visible to everyone (Universal)
+    // dashboard, profile, callsheets, timesheet, renforts, logistics, team, inventory, social, expenses, local_marketplace
+    return true;
   };
 
   // Re-evaluating filter logic to be more generic if possible, but keeping explicit overrides
